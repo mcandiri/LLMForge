@@ -1,0 +1,387 @@
+@page "/playground"
+@rendermode InteractiveServer
+@inject ApiKeyService KeyService
+@inject OrchestrationHistoryService History
+@inject IHttpClientFactory HttpClientFactory
+@inject ILoggerFactory LoggerFactory
+
+<PageTitle>LLMForge - Playground</PageTitle>
+
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col">
+            <h2 class="fw-bold mb-1">Playground</h2>
+            <p class="text-muted mb-0">Send prompts to multiple LLM providers and compare results side by side.</p>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <!-- Input panel -->
+        <div class="col-lg-5">
+            <div class="card bg-card border-subtle">
+                <div class="card-body">
+                    <h6 class="fw-semibold mb-3">Prompt Configuration</h6>
+
+                    <div class="mb-3">
+                        <label class="form-label small text-muted">System Prompt (optional)</label>
+                        <textarea class="form-control bg-input border-subtle"
+                                  rows="3"
+                                  placeholder="You are a helpful assistant. Always respond in valid JSON."
+                                  @bind="_systemPrompt"></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small text-muted">User Prompt</label>
+                        <textarea class="form-control bg-input border-subtle"
+                                  rows="5"
+                                  placeholder="Enter your prompt here..."
+                                  @bind="_userPrompt"></textarea>
+                    </div>
+
+                    <!-- Provider selection -->
+                    <div class="mb-3">
+                        <label class="form-label small text-muted">Providers</label>
+                        <div class="d-flex flex-wrap gap-3">
+                            @if (KeyService.HasKey("OpenAI"))
+                            {
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="chkOpenAI"
+                                           checked="@_useOpenAI" @onchange="e => _useOpenAI = (bool)(e.Value ?? false)" />
+                                    <label class="form-check-label small" for="chkOpenAI">
+                                        <span class="status-dot status-configured me-1"></span> OpenAI
+                                    </label>
+                                </div>
+                            }
+                            @if (KeyService.HasKey("Anthropic"))
+                            {
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="chkAnthropic"
+                                           checked="@_useAnthropic" @onchange="e => _useAnthropic = (bool)(e.Value ?? false)" />
+                                    <label class="form-check-label small" for="chkAnthropic">
+                                        <span class="status-dot status-configured me-1"></span> Anthropic
+                                    </label>
+                                </div>
+                            }
+                            @if (KeyService.HasKey("Gemini"))
+                            {
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="chkGemini"
+                                           checked="@_useGemini" @onchange="e => _useGemini = (bool)(e.Value ?? false)" />
+                                    <label class="form-check-label small" for="chkGemini">
+                                        <span class="status-dot status-configured me-1"></span> Gemini
+                                    </label>
+                                </div>
+                            }
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="chkOllama"
+                                       checked="@_useOllama" @onchange="e => _useOllama = (bool)(e.Value ?? false)" />
+                                <label class="form-check-label small" for="chkOllama">
+                                    <span class="status-dot status-none me-1"></span> Ollama
+                                </label>
+                            </div>
+                        </div>
+                        @if (!KeyService.HasKey("OpenAI") && !KeyService.HasKey("Anthropic") && !KeyService.HasKey("Gemini"))
+                        {
+                            <div class="alert alert-warning small mt-2 mb-0 py-2">
+                                No API keys configured. Go to <a href="/">Home</a> to add your keys first.
+                            </div>
+                        }
+                    </div>
+
+                    <!-- Consensus strategy -->
+                    <div class="mb-3">
+                        <label class="form-label small text-muted">Consensus Strategy</label>
+                        <select class="form-select form-select-sm bg-input border-subtle" @bind="_consensusStrategy">
+                            <option value="HighestScore">Highest Score</option>
+                            <option value="MajorityVote">Majority Vote</option>
+                            <option value="Quorum">Quorum</option>
+                        </select>
+                    </div>
+
+                    <button class="btn btn-accent w-100"
+                            disabled="@(string.IsNullOrWhiteSpace(_userPrompt) || _isRunning || !HasSelectedProviders)"
+                            @onclick="RunOrchestration">
+                        @if (_isRunning)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                            <text>Running Orchestration...</text>
+                        }
+                        else
+                        {
+                            <text>Run Orchestration</text>
+                        }
+                    </button>
+
+                    @if (!string.IsNullOrEmpty(_errorMessage))
+                    {
+                        <div class="alert alert-danger mt-3 small mb-0">@_errorMessage</div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Results panel -->
+        <div class="col-lg-7">
+            @if (_result != null)
+            {
+                <!-- Summary bar -->
+                <div class="card bg-card border-subtle mb-3">
+                    <div class="card-body py-2">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <div>
+                                <small class="text-muted">Winner:</small>
+                                <span class="badge bg-accent text-dark ms-1">@_result.BestProvider</span>
+                            </div>
+                            <div>
+                                <small class="text-muted">Score:</small>
+                                <span class="fw-semibold ms-1">@_result.BestScore.ToString("F2")</span>
+                            </div>
+                            <div>
+                                <small class="text-muted">Time:</small>
+                                <span class="fw-semibold ms-1">@(_result.ExecutionTime.TotalMilliseconds.ToString("F0"))ms</span>
+                            </div>
+                            <div>
+                                <small class="text-muted">Consensus:</small>
+                                <span class="badge @(_result.ConsensusReached ? "bg-success" : "bg-secondary") ms-1">
+                                    @(_result.ConsensusReached ? "Yes" : "No")
+                                </span>
+                            </div>
+                            <div>
+                                <small class="text-muted">Models:</small>
+                                <span class="fw-semibold ms-1">@_result.AgreementCount/@_result.TotalModels</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Individual response cards -->
+                <div class="row g-3">
+                    @foreach (var response in _result.AllResponses.OrderByDescending(r => r.Score))
+                    {
+                        var isWinner = response.ProviderName == _result.BestProvider;
+                        <div class="col-12">
+                            <div class="card bg-card @(isWinner ? "border-accent" : "border-subtle")">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <h6 class="mb-0 fw-semibold">@response.ProviderName</h6>
+                                            @if (isWinner)
+                                            {
+                                                <span class="badge bg-accent text-dark">Winner</span>
+                                            }
+                                        </div>
+                                        <div class="d-flex gap-3">
+                                            <small class="text-muted">
+                                                <span class="fw-semibold">@(response.ResponseTime.TotalMilliseconds.ToString("F0"))</span>ms
+                                            </small>
+                                            <small class="text-muted">
+                                                <span class="fw-semibold">@response.TotalTokens</span> tokens
+                                            </small>
+                                            <small class="text-muted">
+                                                Score: <span class="fw-semibold">@response.Score.ToString("F2")</span>
+                                            </small>
+                                        </div>
+                                    </div>
+
+                                    <!-- Score bar -->
+                                    <div class="score-bar-container mb-2">
+                                        <div class="score-bar @(isWinner ? "score-bar-winner" : "")"
+                                             style="width: @((response.Score * 100).ToString("F0"))%">
+                                        </div>
+                                    </div>
+
+                                    <!-- Response content -->
+                                    <div class="response-content small">
+                                        <pre class="mb-0 text-light">@response.Content</pre>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <!-- Failures -->
+                @if (_result.Failures.Count > 0)
+                {
+                    <div class="card bg-card border-subtle mt-3">
+                        <div class="card-body">
+                            <h6 class="fw-semibold text-danger mb-2">Failures</h6>
+                            @foreach (var failure in _result.Failures)
+                            {
+                                <div class="d-flex justify-content-between small mb-1">
+                                    <span class="text-muted">@failure.Provider</span>
+                                    <span class="text-danger">@failure.Error</span>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="card bg-card border-subtle h-100">
+                    <div class="card-body d-flex align-items-center justify-content-center text-center" style="min-height: 300px;">
+                        <div>
+                            <h5 class="text-muted mb-2">No results yet</h5>
+                            <p class="text-secondary small">Configure your prompt and select providers, then click Run Orchestration.</p>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private string _systemPrompt = string.Empty;
+    private string _userPrompt = string.Empty;
+    private string _consensusStrategy = "HighestScore";
+    private bool _useOpenAI = true;
+    private bool _useAnthropic = true;
+    private bool _useGemini = true;
+    private bool _useOllama;
+    private bool _isRunning;
+    private string? _errorMessage;
+    private OrchestrationResult? _result;
+
+    private bool HasSelectedProviders =>
+        (_useOpenAI && KeyService.HasKey("OpenAI")) ||
+        (_useAnthropic && KeyService.HasKey("Anthropic")) ||
+        (_useGemini && KeyService.HasKey("Gemini")) ||
+        _useOllama;
+
+    private async Task RunOrchestration()
+    {
+        if (string.IsNullOrWhiteSpace(_userPrompt)) return;
+
+        _isRunning = true;
+        _errorMessage = null;
+        _result = null;
+        StateHasChanged();
+
+        try
+        {
+            // Build providers from session keys (not the DI singleton)
+            var registry = new LLMForge.Providers.ProviderRegistry();
+
+            if (_useOpenAI && KeyService.HasKey("OpenAI"))
+            {
+                var config = new LLMForge.Configuration.ModelConfig
+                {
+                    ApiKey = KeyService.OpenAIKey!,
+                    Model = "gpt-4o",
+                    MaxTokens = 2000,
+                    TimeoutSeconds = 30,
+                    ProviderName = "OpenAI"
+                };
+                var client = HttpClientFactory.CreateClient("OpenAI");
+                registry.Register(new LLMForge.Providers.OpenAIProvider(client, config, LoggerFactory.CreateLogger<LLMForge.Providers.OpenAIProvider>()));
+            }
+
+            if (_useAnthropic && KeyService.HasKey("Anthropic"))
+            {
+                var config = new LLMForge.Configuration.ModelConfig
+                {
+                    ApiKey = KeyService.AnthropicKey!,
+                    Model = "claude-sonnet-4-20250514",
+                    MaxTokens = 2000,
+                    TimeoutSeconds = 30,
+                    ProviderName = "Anthropic"
+                };
+                var client = HttpClientFactory.CreateClient("Anthropic");
+                registry.Register(new LLMForge.Providers.AnthropicProvider(client, config, LoggerFactory.CreateLogger<LLMForge.Providers.AnthropicProvider>()));
+            }
+
+            if (_useGemini && KeyService.HasKey("Gemini"))
+            {
+                var config = new LLMForge.Configuration.ModelConfig
+                {
+                    ApiKey = KeyService.GeminiKey!,
+                    Model = "gemini-2.0-flash",
+                    MaxTokens = 2000,
+                    TimeoutSeconds = 30,
+                    ProviderName = "Gemini"
+                };
+                var client = HttpClientFactory.CreateClient("Gemini");
+                registry.Register(new LLMForge.Providers.GeminiProvider(client, config, LoggerFactory.CreateLogger<LLMForge.Providers.GeminiProvider>()));
+            }
+
+            if (_useOllama)
+            {
+                var baseUrl = KeyService.OllamaBaseUrl ?? "http://localhost:11434";
+                var config = new LLMForge.Configuration.ModelConfig
+                {
+                    BaseUrl = baseUrl,
+                    Model = "llama3",
+                    MaxTokens = 2000,
+                    TimeoutSeconds = 60,
+                    ProviderName = "Ollama"
+                };
+                var client = HttpClientFactory.CreateClient("Ollama");
+                registry.Register(new LLMForge.Providers.OllamaProvider(client, config, LoggerFactory.CreateLogger<LLMForge.Providers.OllamaProvider>()));
+            }
+
+            if (registry.Count == 0)
+            {
+                _errorMessage = "No providers selected or configured. Add API keys on the Home page first.";
+                return;
+            }
+
+            // Create orchestrator with session keys
+            var diagnostics = new LLMForge.Diagnostics.ForgeDiagnostics();
+            var options = new LLMForge.Configuration.ForgeOptions { EnableDiagnostics = true };
+            var orchestrator = new LLMForge.ForgeOrchestrator(registry, diagnostics, LoggerFactory, options);
+
+            var consensus = _consensusStrategy switch
+            {
+                "MajorityVote" => LLMForge.Configuration.ConsensusStrategy.MajorityVote,
+                "Quorum" => LLMForge.Configuration.ConsensusStrategy.Quorum,
+                _ => LLMForge.Configuration.ConsensusStrategy.HighestScore
+            };
+
+            _result = await orchestrator.OrchestrateAsync(_userPrompt, opts =>
+            {
+                opts.Consensus = consensus;
+                if (!string.IsNullOrWhiteSpace(_systemPrompt))
+                    opts.SystemPrompt = _systemPrompt;
+            });
+
+            if (_result.IsSuccess)
+            {
+                History.AddRecord(new OrchestrationRecord
+                {
+                    Prompt = _userPrompt,
+                    SystemPrompt = string.IsNullOrWhiteSpace(_systemPrompt) ? null : _systemPrompt,
+                    BestProvider = _result.BestProvider,
+                    BestResponse = _result.BestResponse,
+                    BestScore = _result.BestScore,
+                    ExecutionTime = _result.ExecutionTime,
+                    TotalModels = _result.TotalModels,
+                    ConsensusReached = _result.ConsensusReached,
+                    Responses = _result.AllResponses.Select(r => new ResponseSummary
+                    {
+                        Provider = r.ProviderName,
+                        Content = r.Content,
+                        Score = r.Score,
+                        ResponseTime = r.ResponseTime,
+                        Tokens = r.TotalTokens,
+                        IsWinner = r.ProviderName == _result.BestProvider
+                    }).ToList()
+                });
+            }
+            else
+            {
+                _errorMessage = _result.FailureReason ?? "Orchestration failed.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            _isRunning = false;
+            StateHasChanged();
+        }
+    }
+}

@@ -1,0 +1,53 @@
+@inherits LayoutComponentBase
+
+<div class="app-layout d-flex">
+    <!-- Sidebar -->
+    <nav class="sidebar d-flex flex-column p-3">
+        <div class="sidebar-brand mb-4 px-2">
+            <h5 class="mb-0 fw-bold">
+                <span class="text-accent">LLM</span>Forge
+            </h5>
+            <small class="text-muted">Multi-LLM Orchestrator</small>
+        </div>
+
+        <ul class="nav nav-pills flex-column gap-1">
+            <li class="nav-item">
+                <NavLink class="nav-link sidebar-link" href="" Match="NavLinkMatch.All">
+                    <span class="nav-icon">&#9679;</span>
+                    Home
+                </NavLink>
+            </li>
+            <li class="nav-item">
+                <NavLink class="nav-link sidebar-link" href="playground">
+                    <span class="nav-icon">&#9654;</span>
+                    Playground
+                </NavLink>
+            </li>
+            <li class="nav-item">
+                <NavLink class="nav-link sidebar-link" href="pipeline">
+                    <span class="nav-icon">&#9881;</span>
+                    Pipeline Builder
+                </NavLink>
+            </li>
+            <li class="nav-item">
+                <NavLink class="nav-link sidebar-link" href="analytics">
+                    <span class="nav-icon">&#9632;</span>
+                    Analytics
+                </NavLink>
+            </li>
+        </ul>
+
+        <div class="mt-auto px-2">
+            <hr class="border-secondary" />
+            <small class="text-muted d-block">LLMForge Demo v1.0</small>
+            <small class="text-muted d-block">Keys stored in-memory only</small>
+        </div>
+    </nav>
+
+    <!-- Main content -->
+    <main class="main-content flex-grow-1">
+        <div class="content-wrapper p-4">
+            @Body
+        </div>
+    </main>
+</div>
