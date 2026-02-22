@@ -4,7 +4,7 @@
 
 [![.NET 8](https://img.shields.io/badge/.NET-8.0-512BD4?style=flat&logo=dotnet)](https://dotnet.microsoft.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-70%20%E2%9C%93-brightgreen)]()
+[![Tests](https://img.shields.io/badge/Tests-99%20passing-brightgreen)]()
 
 ---
 
@@ -56,7 +56,9 @@ Multiple models. Validated responses. Weighted scoring. Consensus-based selectio
 - **3 consensus strategies** — Highest Score, Majority Vote, Quorum
 - **Fluent pipeline API** — chain every stage with a clean builder pattern
 - **Prompt templates** — `{{variable}}` substitution with default values
-- **Configurable retry policies** — Exponential Backoff with jitter, Fixed Delay
+- **Configurable retry policies** — Exponential Backoff with jitter, Fixed Delay, Rate-Limit Aware
+- **Circuit breaker pattern** — per-provider Open/HalfOpen/Closed state machine with configurable thresholds
+- **Rate-limit detection** — Retry-After + X-RateLimit header parsing, automatic backoff on 429
 - **Built-in performance analytics** — success rates, latency, win rates per model
 - **Thread-safe concurrent execution** — `ConcurrentDictionary`-backed tracking
 - **Zero external LLM SDKs** — raw `HttpClient` to each provider's REST API
@@ -286,6 +288,7 @@ var result = await forge.OrchestrateFromTemplateAsync("exam-question",
 |--------|----------|
 | `ExponentialBackoff` | Delay doubles each attempt with random jitter, capped at 30s |
 | `FixedDelay` | Constant 2-second wait between retries |
+| `RateLimitAware` | Respects `Retry-After` headers from 429 responses, falls back to exponential backoff |
 | `None` | No retries (default) |
 
 ```csharp
@@ -365,10 +368,11 @@ API keys are stored in session memory only — never written to disk.
 | Templates |               Pipeline API                  |
 |  Library  |  Enrich -> Execute -> Validate -> Score     |
 +-----------+---------------------------------------------+
-|   Retry   |              Diagnostics                    |
-|  ExpBack  |  PipelineEvents | PerformanceTracker        |
-|  FixDelay |                                             |
-+-----------+---------------------------------------------+
+|   Retry   |  Resilience  |       Diagnostics           |
+|  ExpBack  |  Circuit     |  PipelineEvents             |
+|  FixDelay |  Breaker     |  PerformanceTracker         |
+|  RateAwr  |  RateLimit   |                             |
++-----------+--------------+-----------------------------+
 ```
 
 **Design principles:**
@@ -413,10 +417,11 @@ LLMForge/
 │   ├── Consensus/             HighestScore, MajorityVote, Quorum
 │   ├── Pipeline/              Fluent pipeline builder
 │   ├── Retry/                 ExponentialBackoff, FixedDelay
+│   ├── Resilience/            CircuitBreaker, RateLimitInfo, RateLimitAwareRetry
 │   ├── Diagnostics/           Performance tracking
 │   ├── Templates/             Prompt templates
 │   └── Extensions/            DI registration
-├── tests/LLMForge.Tests/      70 unit tests (xUnit + Moq + FluentAssertions)
+├── tests/LLMForge.Tests/      99 unit tests (xUnit + Moq + FluentAssertions)
 ├── samples/LLMForge.Demo/     Blazor Server demo UI
 └── LLMForge.sln
 ```
@@ -443,9 +448,11 @@ dotnet run --project samples/LLMForge.Demo
 
 ## Roadmap
 
+- [x] Semantic similarity scoring (TF-IDF + cosine similarity)
+- [x] Rate limiting per provider with circuit breaker
+- [x] Configurable scoring weights via `ForgeOptions`
+- [x] Reflection-based provider plug-in system
 - [ ] Streaming response support
-- [ ] Semantic similarity scoring (embeddings-based)
-- [ ] Rate limiting per provider
 - [ ] OpenTelemetry integration
 - [ ] Azure OpenAI provider
 - [ ] Response caching layer
