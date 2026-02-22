@@ -30,6 +30,22 @@ public class ForgeOptions
     public bool EnableDiagnostics { get; set; } = true;
 
     /// <summary>
+    /// Gets or sets the default scoring weights used by the orchestrator.
+    /// Keys are scorer names (e.g., "ResponseTime", "Consensus"), values are weights.
+    /// Weights are normalized at scoring time. Defaults to ResponseTime=0.3, Consensus=0.7.
+    /// </summary>
+    public Dictionary<string, double> DefaultScoringWeights { get; set; } = new()
+    {
+        ["ResponseTime"] = 0.3,
+        ["Consensus"] = 0.7
+    };
+
+    /// <summary>
+    /// Gets or sets circuit breaker options for resilient provider calls.
+    /// </summary>
+    public CircuitBreakerOptions CircuitBreaker { get; set; } = new();
+
+    /// <summary>
     /// Registers an LLM provider with its configuration.
     /// </summary>
     /// <typeparam name="TProvider">The provider type implementing <see cref="ILLMProvider"/>.</typeparam>

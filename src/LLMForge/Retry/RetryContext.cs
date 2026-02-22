@@ -1,3 +1,6 @@
+using System.Net;
+using LLMForge.Resilience;
+
 namespace LLMForge.Retry;
 
 /// <summary>
@@ -34,4 +37,14 @@ public class RetryContext
     /// Gets whether more retry attempts are available.
     /// </summary>
     public bool CanRetry => AttemptNumber < MaxAttempts;
+
+    /// <summary>
+    /// Gets or sets rate-limit information from the last failed response, if applicable.
+    /// </summary>
+    public RateLimitInfo? RateLimitInfo { get; set; }
+
+    /// <summary>
+    /// Gets or sets the HTTP status code from the last failed response, if applicable.
+    /// </summary>
+    public HttpStatusCode? HttpStatusCode { get; set; }
 }

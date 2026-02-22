@@ -76,5 +76,8 @@ public enum RetryPolicy
     FixedDelay,
 
     /// <summary>Exponentially increasing delay between retries.</summary>
-    ExponentialBackoff
+    ExponentialBackoff,
+
+    /// <summary>Respects Retry-After headers from rate-limited responses, falls back to exponential backoff.</summary>
+    RateLimitAware
 }

@@ -4,7 +4,7 @@ namespace LLMForge.Scoring;
 
 /// <summary>
 /// Scores responses based on how similar they are to other responses (consensus alignment).
-/// Uses a simple token-overlap similarity metric.
+/// Uses TF-IDF + cosine similarity for more accurate semantic comparison.
 /// </summary>
 public class ConsensusScorer : IResponseScorer
 {
@@ -24,8 +24,14 @@ public class ConsensusScorer : IResponseScorer
         if (otherResponses.Count == 0)
             return Task.FromResult(1.0);
 
+        // Build corpus from all successful responses for IDF computation
+        var corpus = allResponses
+            .Where(r => r.IsSuccess)
+            .Select(r => r.Content)
+            .ToList();
+
         var similarities = otherResponses
-            .Select(other => CalculateSimilarity(response.Content, other.Content))
+            .Select(other => CalculateSimilarity(response.Content, other.Content, corpus))
             .ToList();
 
         var averageSimilarity = similarities.Average();
@@ -33,32 +39,15 @@ public class ConsensusScorer : IResponseScorer
     }
 
     /// <summary>
-    /// Calculates a simple token-overlap (Jaccard) similarity between two strings.
+    /// Calculates TF-IDF cosine similarity between two strings within a corpus.
     /// </summary>
-    internal static double CalculateSimilarity(string text1, string text2)
+    internal static double CalculateSimilarity(string text1, string text2, IReadOnlyList<string>? corpus = null)
     {
         if (string.IsNullOrWhiteSpace(text1) || string.IsNullOrWhiteSpace(text2))
             return 0.0;
 
-        var tokens1 = Tokenize(text1);
-        var tokens2 = Tokenize(text2);
-
-        if (tokens1.Count == 0 || tokens2.Count == 0)
-            return 0.0;
-
-        var intersection = tokens1.Intersect(tokens2, StringComparer.OrdinalIgnoreCase).Count();
-        var union = tokens1.Union(tokens2, StringComparer.OrdinalIgnoreCase).Count();
-
-        return union == 0 ? 0.0 : (double)intersection / union;
-    }
-
-    private static HashSet<string> Tokenize(string text)
-    {
-        return text
-            .Split(new[] { ' ', '\t', '\n', '\r', ',', '.', ';', ':', '!', '?', '(', ')', '[', ']', '{', '}', '"', '\'' },
-                StringSplitOptions.RemoveEmptyEntries)
-            .Select(t => t.ToLowerInvariant())
-            .Where(t => t.Length > 1)
-            .ToHashSet();
+        return corpus != null
+            ? TfIdfSimilarityCalculator.Calculate(text1, text2, corpus)
+            : TfIdfSimilarityCalculator.Calculate(text1, text2);
     }
 }

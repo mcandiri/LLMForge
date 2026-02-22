@@ -95,28 +95,40 @@ public class ForgeOrchestrator : IForgeOrchestrator
             };
         }
 
-        // Score responses
+        // Score responses using configurable weights
         var allResponses = executionResult.SuccessfulResponses;
         var scoredResponses = new List<ScoredResponse>();
 
+        // Resolve weights: per-call override > global default
+        var weights = opts.ScoringWeights ?? _options.DefaultScoringWeights;
+
+        // Build a WeightedScorer from configuration
+        var scorerMap = new Dictionary<string, IResponseScorer>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["ResponseTime"] = new ResponseTimeScorer(),
+            ["Consensus"] = new ConsensusScorer(),
+            ["TokenEfficiency"] = new TokenEfficiencyScorer()
+        };
+
+        var weightedScorer = new WeightedScorer();
+        foreach (var (key, weight) in weights)
+        {
+            if (scorerMap.TryGetValue(key, out var scorer))
+            {
+                weightedScorer.Add(scorer, weight);
+            }
+        }
+
         foreach (var response in allResponses)
         {
-            var responseTimeScorer = new ResponseTimeScorer();
-            var consensusScorer = new ConsensusScorer();
-            var timeScore = await responseTimeScorer.ScoreAsync(response, allResponses, cancellationToken);
-            var consensusScore = await consensusScorer.ScoreAsync(response, allResponses, cancellationToken);
-            var compositeScore = (timeScore * 0.3) + (consensusScore * 0.7);
+            var detailed = await weightedScorer.ScoreDetailedAsync(response, allResponses, cancellationToken);
 
             scoredResponses.Add(new ScoredResponse
             {
                 ProviderName = response.ProviderName,
                 Content = response.Content,
-                Score = compositeScore,
-                ScoreBreakdown = new Dictionary<string, double>
-                {
-                    ["ResponseTime"] = timeScore,
-                    ["Consensus"] = consensusScore
-                },
+                Score = detailed.Score,
+                ScoreBreakdown = detailed.ScoreBreakdown,
                 ResponseTime = response.Duration,
                 TotalTokens = response.TotalTokens
             });

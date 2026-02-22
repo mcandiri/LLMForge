@@ -68,26 +68,26 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
-    private static ILLMProvider? CreateProvider(
+    private static ILLMProvider CreateProvider(
         ProviderRegistration registration,
         HttpClient httpClient,
         ILoggerFactory loggerFactory)
     {
-        var config = registration.Config;
         var providerType = registration.ProviderType;
 
-        if (providerType == typeof(OpenAIProvider))
-            return new OpenAIProvider(httpClient, config, loggerFactory.CreateLogger<OpenAIProvider>());
+        // Create the typed ILogger<T> using the generic CreateLogger<T> method via reflection
+        // This ensures Activator.CreateInstance can match the ctor(HttpClient, ModelConfig, ILogger<T>) signature
+        var createLoggerMethod = typeof(LoggerFactoryExtensions)
+            .GetMethod(nameof(LoggerFactoryExtensions.CreateLogger), new[] { typeof(ILoggerFactory) });
+        var genericMethod = createLoggerMethod!.MakeGenericMethod(providerType);
+        var logger = genericMethod.Invoke(null, new object[] { loggerFactory })!;
 
-        if (providerType == typeof(AnthropicProvider))
-            return new AnthropicProvider(httpClient, config, loggerFactory.CreateLogger<AnthropicProvider>());
+        // All providers follow the convention: ctor(HttpClient, ModelConfig, ILogger<T>)
+        var instance = Activator.CreateInstance(providerType, httpClient, registration.Config, logger)
+            ?? throw new InvalidOperationException(
+                $"Failed to create provider instance of type '{providerType.FullName}'. " +
+                $"Ensure the provider has a public constructor accepting (HttpClient, ModelConfig, ILogger<T>).");
 
-        if (providerType == typeof(GeminiProvider))
-            return new GeminiProvider(httpClient, config, loggerFactory.CreateLogger<GeminiProvider>());
-
-        if (providerType == typeof(OllamaProvider))
-            return new OllamaProvider(httpClient, config, loggerFactory.CreateLogger<OllamaProvider>());
-
-        return null;
+        return (ILLMProvider)instance;
     }
 }
