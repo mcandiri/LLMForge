@@ -4,7 +4,7 @@
 
 [![.NET 8](https://img.shields.io/badge/.NET-8.0-512BD4?style=flat&logo=dotnet)](https://dotnet.microsoft.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-70%20passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/Tests-70%20%E2%9C%93-brightgreen)]()
 
 ---
 
@@ -392,6 +392,14 @@ API keys are stored in session memory only — never written to disk.
 
 ---
 
+## Born From Production
+
+> LLMForge was extracted from the AI orchestration layer of an enterprise education platform that uses 5 LLM models with autonomous agent architecture to generate and validate curriculum-aligned content for 1,500+ students.
+
+Every feature exists because a production system needed it: multi-model consensus to catch hallucinations, fallback chains for 99.9% uptime, JSON validation for downstream services, and analytics to decide which model to promote next quarter.
+
+---
+
 ## Project Structure
 
 ```
@@ -418,7 +426,7 @@ LLMForge/
 ## Getting Started
 
 ```bash
-git clone https://github.com/mehmetcandiri/LLMForge.git
+git clone https://github.com/mcandiri/LLMForge.git
 cd LLMForge
 
 # Build
