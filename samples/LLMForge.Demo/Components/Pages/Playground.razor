@@ -2,8 +2,7 @@
 @rendermode InteractiveServer
 @inject ApiKeyService KeyService
 @inject OrchestrationHistoryService History
-@inject IHttpClientFactory HttpClientFactory
-@inject ILoggerFactory LoggerFactory
+@inject OrchestratorFactory OrchestratorFactory
 
 <PageTitle>LLMForge - Playground</PageTitle>
 
@@ -261,76 +260,13 @@
 
         try
         {
-            // Build providers from session keys (not the DI singleton)
-            var registry = new LLMForge.Providers.ProviderRegistry();
-
-            if (_useOpenAI && KeyService.HasKey("OpenAI"))
-            {
-                var config = new LLMForge.Configuration.ModelConfig
-                {
-                    ApiKey = KeyService.OpenAIKey!,
-                    Model = "gpt-4o",
-                    MaxTokens = 2000,
-                    TimeoutSeconds = 30,
-                    ProviderName = "OpenAI"
-                };
-                var client = HttpClientFactory.CreateClient("OpenAI");
-                registry.Register(new LLMForge.Providers.OpenAIProvider(client, config, LoggerFactory.CreateLogger<LLMForge.Providers.OpenAIProvider>()));
-            }
-
-            if (_useAnthropic && KeyService.HasKey("Anthropic"))
-            {
-                var config = new LLMForge.Configuration.ModelConfig
-                {
-                    ApiKey = KeyService.AnthropicKey!,
-                    Model = "claude-sonnet-4-20250514",
-                    MaxTokens = 2000,
-                    TimeoutSeconds = 30,
-                    ProviderName = "Anthropic"
-                };
-                var client = HttpClientFactory.CreateClient("Anthropic");
-                registry.Register(new LLMForge.Providers.AnthropicProvider(client, config, LoggerFactory.CreateLogger<LLMForge.Providers.AnthropicProvider>()));
-            }
-
-            if (_useGemini && KeyService.HasKey("Gemini"))
-            {
-                var config = new LLMForge.Configuration.ModelConfig
-                {
-                    ApiKey = KeyService.GeminiKey!,
-                    Model = "gemini-2.0-flash",
-                    MaxTokens = 2000,
-                    TimeoutSeconds = 30,
-                    ProviderName = "Gemini"
-                };
-                var client = HttpClientFactory.CreateClient("Gemini");
-                registry.Register(new LLMForge.Providers.GeminiProvider(client, config, LoggerFactory.CreateLogger<LLMForge.Providers.GeminiProvider>()));
-            }
-
-            if (_useOllama)
-            {
-                var baseUrl = KeyService.OllamaBaseUrl ?? "http://localhost:11434";
-                var config = new LLMForge.Configuration.ModelConfig
-                {
-                    BaseUrl = baseUrl,
-                    Model = "llama3",
-                    MaxTokens = 2000,
-                    TimeoutSeconds = 60,
-                    ProviderName = "Ollama"
-                };
-                var client = HttpClientFactory.CreateClient("Ollama");
-                registry.Register(new LLMForge.Providers.OllamaProvider(client, config, LoggerFactory.CreateLogger<LLMForge.Providers.OllamaProvider>()));
-            }
-
-            if (registry.Count == 0)
+            if (!OrchestratorFactory.HasConfiguredProviders)
             {
                 _errorMessage = "No providers selected or configured. Add API keys on the Home page first.";
                 return;
             }
 
-            // Create orchestrator with session keys
-            var diagnostics = new LLMForge.Diagnostics.ForgeDiagnostics();
-            var options = new LLMForge.Configuration.ForgeOptions { EnableDiagnostics = true };
-            var orchestrator = new LLMForge.ForgeOrchestrator(registry, diagnostics, LoggerFactory, options);
+            var orchestrator = OrchestratorFactory.Create();
 
             var consensus = _consensusStrategy switch
             {

@@ -1,6 +1,5 @@
 @page "/analytics"
 @rendermode InteractiveServer
-@inject IForgeOrchestrator Orchestrator
 @inject OrchestrationHistoryService History
 
 <PageTitle>LLMForge - Analytics</PageTitle>
@@ -21,9 +20,23 @@
     </div>
 
     @{
-        var snapshot = Orchestrator.GetAnalytics();
-        var models = snapshot.Models;
         var history = History.GetHistory();
+        var allResponses = history.SelectMany(h => h.Responses).ToList();
+        var providerNames = allResponses.Select(r => r.Provider).Distinct().ToList();
+        var modelStats = providerNames.Select(p =>
+        {
+            var responses = allResponses.Where(r => r.Provider == p).ToList();
+            var wins = responses.Count(r => r.IsWinner);
+            return new
+            {
+                Name = p,
+                TotalRequests = responses.Count,
+                AvgLatency = responses.Average(r => r.ResponseTime.TotalMilliseconds),
+                WinRate = responses.Count > 0 ? (double)wins / responses.Count : 0,
+                AvgScore = responses.Average(r => r.Score),
+                AvgTokens = (int)responses.Average(r => r.Tokens)
+            };
+        }).ToList();
     }
 
     <!-- Performance Summary Cards -->
@@ -31,7 +44,7 @@
         <div class="col-md-3">
             <div class="card bg-card border-subtle">
                 <div class="card-body text-center">
-                    <h3 class="fw-bold text-accent mb-1">@models.Count</h3>
+                    <h3 class="fw-bold text-accent mb-1">@providerNames.Count</h3>
                     <small class="text-muted">Tracked Models</small>
                 </div>
             </div>
@@ -39,8 +52,8 @@
         <div class="col-md-3">
             <div class="card bg-card border-subtle">
                 <div class="card-body text-center">
-                    <h3 class="fw-bold text-accent mb-1">@models.Sum(m => m.TotalRequests)</h3>
-                    <small class="text-muted">Total Requests</small>
+                    <h3 class="fw-bold text-accent mb-1">@allResponses.Count</h3>
+                    <small class="text-muted">Total Responses</small>
                 </div>
             </div>
         </div>
@@ -48,17 +61,16 @@
             <div class="card bg-card border-subtle">
                 <div class="card-body text-center">
                     <h3 class="fw-bold text-accent mb-1">
-                        @if (models.Count > 0)
+                        @if (history.Count > 0)
                         {
-                            @((models.Average(m => m.SuccessRate) * 100).ToString("F0"))
-                            <text>%</text>
+                            @(history.Average(h => h.BestScore).ToString("F2"))
                         }
                         else
                         {
                             <text>--</text>
                         }
                     </h3>
-                    <small class="text-muted">Avg Success Rate</small>
+                    <small class="text-muted">Avg Best Score</small>
                 </div>
             </div>
         </div>
@@ -72,7 +84,7 @@
         </div>
     </div>
 
-    @if (models.Count > 0)
+    @if (providerNames.Count > 0)
     {
         <!-- Model Comparison Table -->
         <div class="card bg-card border-subtle mb-4">
@@ -85,31 +97,25 @@
                                 <th class="border-subtle">Model</th>
                                 <th class="border-subtle text-end">Requests</th>
                                 <th class="border-subtle text-end">Avg Latency</th>
-                                <th class="border-subtle text-end">Success Rate</th>
                                 <th class="border-subtle text-end">Win Rate</th>
                                 <th class="border-subtle text-end">Avg Score</th>
                                 <th class="border-subtle text-end">Avg Tokens</th>
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach (var model in models.OrderByDescending(m => m.WinRate))
+                            @foreach (var model in modelStats.OrderByDescending(m => m.WinRate))
                             {
                                 <tr>
                                     <td class="border-subtle fw-semibold">@model.Name</td>
                                     <td class="border-subtle text-end">@model.TotalRequests</td>
-                                    <td class="border-subtle text-end">@(model.AverageLatency.TotalMilliseconds.ToString("F0"))ms</td>
-                                    <td class="border-subtle text-end">
-                                        <span class="@(model.SuccessRate >= 0.8 ? "text-success" : model.SuccessRate >= 0.5 ? "text-warning" : "text-danger")">
-                                            @((model.SuccessRate * 100).ToString("F0"))%
-                                        </span>
-                                    </td>
+                                    <td class="border-subtle text-end">@(model.AvgLatency.ToString("F0"))ms</td>
                                     <td class="border-subtle text-end">
                                         <span class="@(model.WinRate >= 0.3 ? "text-accent" : "text-muted")">
                                             @((model.WinRate * 100).ToString("F0"))%
                                         </span>
                                     </td>
-                                    <td class="border-subtle text-end">@(model.AverageScore.ToString("F2"))</td>
-                                    <td class="border-subtle text-end">@model.AvgTokensPerResponse</td>
+                                    <td class="border-subtle text-end">@(model.AvgScore.ToString("F2"))</td>
+                                    <td class="border-subtle text-end">@model.AvgTokens</td>
                                 </tr>
                             }
                         </tbody>
@@ -125,7 +131,7 @@
                 <div class="card bg-card border-subtle h-100">
                     <div class="card-body">
                         <h6 class="fw-semibold mb-3">Win Rate</h6>
-                        @foreach (var model in models.OrderByDescending(m => m.WinRate))
+                        @foreach (var model in modelStats.OrderByDescending(m => m.WinRate))
                         {
                             <div class="mb-2">
                                 <div class="d-flex justify-content-between small mb-1">
@@ -148,43 +154,19 @@
                     <div class="card-body">
                         <h6 class="fw-semibold mb-3">Average Latency</h6>
                         @{
-                            var maxLatency = models.Count > 0 ? models.Max(m => m.AverageLatency.TotalMilliseconds) : 1;
+                            var maxLatency = modelStats.Count > 0 ? modelStats.Max(m => m.AvgLatency) : 1;
                         }
-                        @foreach (var model in models.OrderBy(m => m.AverageLatency))
+                        @foreach (var model in modelStats.OrderBy(m => m.AvgLatency))
                         {
-                            var pct = maxLatency > 0 ? (model.AverageLatency.TotalMilliseconds / maxLatency * 100) : 0;
+                            var pct = maxLatency > 0 ? (model.AvgLatency / maxLatency * 100) : 0;
                             <div class="mb-2">
                                 <div class="d-flex justify-content-between small mb-1">
                                     <span>@model.Name</span>
-                                    <span class="text-muted">@(model.AverageLatency.TotalMilliseconds.ToString("F0"))ms</span>
+                                    <span class="text-muted">@(model.AvgLatency.ToString("F0"))ms</span>
                                 </div>
                                 <div class="chart-bar-container">
                                     <div class="chart-bar chart-bar-latency"
                                          style="width: @(Math.Max(pct, 2).ToString("F0"))%"></div>
-                                </div>
-                            </div>
-                        }
-                    </div>
-                </div>
-            </div>
-
-            <!-- Success Rate Chart -->
-            <div class="col-md-6">
-                <div class="card bg-card border-subtle h-100">
-                    <div class="card-body">
-                        <h6 class="fw-semibold mb-3">Success Rate</h6>
-                        @foreach (var model in models.OrderByDescending(m => m.SuccessRate))
-                        {
-                            <div class="mb-2">
-                                <div class="d-flex justify-content-between small mb-1">
-                                    <span>@model.Name</span>
-                                    <span class="@(model.SuccessRate >= 0.8 ? "text-success" : "text-warning")">
-                                        @((model.SuccessRate * 100).ToString("F0"))%
-                                    </span>
-                                </div>
-                                <div class="chart-bar-container">
-                                    <div class="chart-bar @(model.SuccessRate >= 0.8 ? "chart-bar-success" : "chart-bar-warning")"
-                                         style="width: @(Math.Max(model.SuccessRate * 100, 2).ToString("F0"))%"></div>
                                 </div>
                             </div>
                         }
@@ -197,16 +179,42 @@
                 <div class="card bg-card border-subtle h-100">
                     <div class="card-body">
                         <h6 class="fw-semibold mb-3">Average Score</h6>
-                        @foreach (var model in models.OrderByDescending(m => m.AverageScore))
+                        @foreach (var model in modelStats.OrderByDescending(m => m.AvgScore))
                         {
                             <div class="mb-2">
                                 <div class="d-flex justify-content-between small mb-1">
                                     <span>@model.Name</span>
-                                    <span class="text-accent">@(model.AverageScore.ToString("F2"))</span>
+                                    <span class="text-accent">@(model.AvgScore.ToString("F2"))</span>
                                 </div>
                                 <div class="chart-bar-container">
                                     <div class="chart-bar chart-bar-accent"
-                                         style="width: @(Math.Max(model.AverageScore * 100, 2).ToString("F0"))%"></div>
+                                         style="width: @(Math.Max(model.AvgScore * 100, 2).ToString("F0"))%"></div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- Average Tokens Chart -->
+            <div class="col-md-6">
+                <div class="card bg-card border-subtle h-100">
+                    <div class="card-body">
+                        <h6 class="fw-semibold mb-3">Average Tokens</h6>
+                        @{
+                            var maxTokens = modelStats.Count > 0 ? modelStats.Max(m => m.AvgTokens) : 1;
+                        }
+                        @foreach (var model in modelStats.OrderBy(m => m.AvgTokens))
+                        {
+                            var pct = maxTokens > 0 ? ((double)model.AvgTokens / maxTokens * 100) : 0;
+                            <div class="mb-2">
+                                <div class="d-flex justify-content-between small mb-1">
+                                    <span>@model.Name</span>
+                                    <span class="text-muted">@model.AvgTokens</span>
+                                </div>
+                                <div class="chart-bar-container">
+                                    <div class="chart-bar chart-bar-success"
+                                         style="width: @(Math.Max(pct, 2).ToString("F0"))%"></div>
                                 </div>
                             </div>
                         }
