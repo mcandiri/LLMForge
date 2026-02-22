@@ -2,8 +2,7 @@
 @rendermode InteractiveServer
 @inject ApiKeyService KeyService
 @inject OrchestrationHistoryService History
-@inject IHttpClientFactory HttpClientFactory
-@inject ILoggerFactory LoggerFactory
+@inject OrchestratorFactory OrchestratorFactory
 
 <PageTitle>LLMForge - Pipeline Builder</PageTitle>
 
@@ -314,53 +313,7 @@
     private OrchestrationResult? _pipelineResult;
     private readonly List<LogEntry> _logEntries = new();
 
-    private bool HasConfiguredProviders =>
-        KeyService.HasKey("OpenAI") || KeyService.HasKey("Anthropic") || KeyService.HasKey("Gemini");
-
-    private LLMForge.ForgeOrchestrator BuildOrchestrator()
-    {
-        var registry = new LLMForge.Providers.ProviderRegistry();
-
-        if (KeyService.HasKey("OpenAI"))
-        {
-            var config = new LLMForge.Configuration.ModelConfig
-            {
-                ApiKey = KeyService.OpenAIKey!, Model = "gpt-4o",
-                MaxTokens = 2000, TimeoutSeconds = 30, ProviderName = "OpenAI"
-            };
-            registry.Register(new LLMForge.Providers.OpenAIProvider(
-                HttpClientFactory.CreateClient("OpenAI"), config,
-                LoggerFactory.CreateLogger<LLMForge.Providers.OpenAIProvider>()));
-        }
-
-        if (KeyService.HasKey("Anthropic"))
-        {
-            var config = new LLMForge.Configuration.ModelConfig
-            {
-                ApiKey = KeyService.AnthropicKey!, Model = "claude-sonnet-4-20250514",
-                MaxTokens = 2000, TimeoutSeconds = 30, ProviderName = "Anthropic"
-            };
-            registry.Register(new LLMForge.Providers.AnthropicProvider(
-                HttpClientFactory.CreateClient("Anthropic"), config,
-                LoggerFactory.CreateLogger<LLMForge.Providers.AnthropicProvider>()));
-        }
-
-        if (KeyService.HasKey("Gemini"))
-        {
-            var config = new LLMForge.Configuration.ModelConfig
-            {
-                ApiKey = KeyService.GeminiKey!, Model = "gemini-2.0-flash",
-                MaxTokens = 2000, TimeoutSeconds = 30, ProviderName = "Gemini"
-            };
-            registry.Register(new LLMForge.Providers.GeminiProvider(
-                HttpClientFactory.CreateClient("Gemini"), config,
-                LoggerFactory.CreateLogger<LLMForge.Providers.GeminiProvider>()));
-        }
-
-        var diagnostics = new LLMForge.Diagnostics.ForgeDiagnostics();
-        var options = new LLMForge.Configuration.ForgeOptions { EnableDiagnostics = true };
-        return new LLMForge.ForgeOrchestrator(registry, diagnostics, LoggerFactory, options);
-    }
+    private bool HasConfiguredProviders => OrchestratorFactory.HasConfiguredProviders;
 
     private void AddLog(string level, string message)
     {
@@ -392,7 +345,7 @@
         {
             AddLog("INFO", "Starting pipeline execution...");
 
-            var orchestrator = BuildOrchestrator();
+            var orchestrator = OrchestratorFactory.Create();
             var pipeline = orchestrator.CreatePipeline();
 
             if (!string.IsNullOrWhiteSpace(_systemPrompt))
