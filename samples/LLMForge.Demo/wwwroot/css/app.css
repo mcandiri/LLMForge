@@ -1,0 +1,394 @@
+/* ============================================================
+   LLMForge Demo - Dark Theme
+   ============================================================ */
+
+:root {
+    --bg-primary: #0f0f1a;
+    --bg-secondary: #161625;
+    --bg-card: #1a1a2e;
+    --bg-input: #12121f;
+    --border-subtle: #2a2a42;
+    --accent: #6c63ff;
+    --accent-hover: #5a52e0;
+    --accent-glow: rgba(108, 99, 255, 0.15);
+    --text-primary: #e8e8f0;
+    --text-secondary: #8888a0;
+    --sidebar-width: 240px;
+}
+
+/* ---- Base ---- */
+
+html, body {
+    height: 100%;
+    margin: 0;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* ---- Layout ---- */
+
+.app-layout {
+    min-height: 100vh;
+}
+
+.sidebar {
+    width: var(--sidebar-width);
+    min-height: 100vh;
+    background-color: var(--bg-secondary);
+    border-right: 1px solid var(--border-subtle);
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 100;
+    overflow-y: auto;
+}
+
+.main-content {
+    margin-left: var(--sidebar-width);
+    min-height: 100vh;
+    background-color: var(--bg-primary);
+}
+
+.content-wrapper {
+    max-width: 1400px;
+}
+
+/* ---- Sidebar ---- */
+
+.sidebar-brand {
+    padding: 0.5rem 0;
+}
+
+.sidebar-link {
+    color: var(--text-secondary) !important;
+    border-radius: 8px;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    transition: all 0.15s ease;
+}
+
+.sidebar-link:hover {
+    color: var(--text-primary) !important;
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.sidebar-link.active {
+    color: #fff !important;
+    background-color: var(--accent) !important;
+}
+
+.nav-icon {
+    display: inline-block;
+    width: 20px;
+    text-align: center;
+    margin-right: 0.25rem;
+    font-size: 0.7rem;
+}
+
+/* ---- Cards ---- */
+
+.bg-card {
+    background-color: var(--bg-card) !important;
+}
+
+.border-subtle {
+    border-color: var(--border-subtle) !important;
+}
+
+.border-accent {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 12px var(--accent-glow);
+}
+
+.border-danger {
+    border-color: #dc3545 !important;
+}
+
+.card {
+    border-radius: 10px;
+    border-width: 1px;
+    border-style: solid;
+}
+
+/* ---- Forms ---- */
+
+.bg-input {
+    background-color: var(--bg-input) !important;
+    color: var(--text-primary) !important;
+}
+
+.bg-input::placeholder {
+    color: var(--text-secondary);
+}
+
+.form-control:focus,
+.form-select:focus {
+    background-color: var(--bg-input) !important;
+    border-color: var(--accent) !important;
+    color: var(--text-primary) !important;
+    box-shadow: 0 0 0 0.15rem var(--accent-glow);
+}
+
+.form-select {
+    background-color: var(--bg-input);
+    color: var(--text-primary);
+}
+
+.form-range::-webkit-slider-thumb {
+    background: var(--accent);
+}
+
+.form-range::-moz-range-thumb {
+    background: var(--accent);
+}
+
+.form-range::-webkit-slider-runnable-track {
+    background: var(--border-subtle);
+}
+
+.form-check-input:checked {
+    background-color: var(--accent);
+    border-color: var(--accent);
+}
+
+/* ---- Buttons ---- */
+
+.btn-accent {
+    background-color: var(--accent);
+    color: #fff;
+    border: none;
+    font-weight: 500;
+}
+
+.btn-accent:hover:not(:disabled) {
+    background-color: var(--accent-hover);
+    color: #fff;
+}
+
+.btn-accent:disabled {
+    background-color: var(--accent);
+    opacity: 0.5;
+    color: #fff;
+}
+
+.btn-outline-light {
+    border-color: var(--border-subtle);
+    color: var(--text-secondary);
+}
+
+.btn-outline-light:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+    border-color: var(--text-secondary);
+    color: var(--text-primary);
+}
+
+/* ---- Status Dots ---- */
+
+.status-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.status-connected {
+    background-color: #22c55e;
+    box-shadow: 0 0 6px rgba(34, 197, 94, 0.5);
+}
+
+.status-error {
+    background-color: #ef4444;
+    box-shadow: 0 0 6px rgba(239, 68, 68, 0.5);
+}
+
+.status-configured {
+    background-color: #f59e0b;
+    box-shadow: 0 0 6px rgba(245, 158, 11, 0.3);
+}
+
+.status-none {
+    background-color: var(--border-subtle);
+}
+
+/* ---- Accent text ---- */
+
+.text-accent {
+    color: var(--accent) !important;
+}
+
+.bg-accent {
+    background-color: var(--accent) !important;
+}
+
+/* ---- Score bars ---- */
+
+.score-bar-container {
+    height: 4px;
+    background-color: var(--border-subtle);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.score-bar {
+    height: 100%;
+    background-color: var(--text-secondary);
+    border-radius: 2px;
+    transition: width 0.4s ease;
+}
+
+.score-bar-winner {
+    background-color: var(--accent);
+}
+
+/* ---- Chart bars ---- */
+
+.chart-bar-container {
+    height: 8px;
+    background-color: var(--bg-input);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.chart-bar {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.5s ease;
+}
+
+.chart-bar-accent {
+    background-color: var(--accent);
+}
+
+.chart-bar-latency {
+    background-color: #f59e0b;
+}
+
+.chart-bar-success {
+    background-color: #22c55e;
+}
+
+.chart-bar-warning {
+    background-color: #f59e0b;
+}
+
+/* ---- Response content ---- */
+
+.response-content {
+    background-color: var(--bg-input);
+    border-radius: 6px;
+    padding: 0.75rem;
+    overflow-x: auto;
+}
+
+.response-content pre {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 0.8rem;
+    line-height: 1.5;
+}
+
+/* ---- Execution log ---- */
+
+.execution-log {
+    background-color: var(--bg-input);
+    border-radius: 6px;
+    padding: 0.75rem;
+    max-height: 300px;
+    overflow-y: auto;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+}
+
+.log-entry .badge {
+    font-size: 0.65rem;
+    padding: 0.15rem 0.35rem;
+    font-weight: 500;
+}
+
+/* ---- Tables ---- */
+
+.table-dark {
+    --bs-table-bg: transparent;
+    --bs-table-hover-bg: rgba(255, 255, 255, 0.03);
+}
+
+.table-dark th {
+    font-weight: 500;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.table-dark td {
+    vertical-align: middle;
+}
+
+/* ---- Badges ---- */
+
+.badge {
+    font-weight: 500;
+    font-size: 0.7rem;
+}
+
+/* ---- Alerts ---- */
+
+.alert-danger {
+    background-color: rgba(220, 53, 69, 0.1);
+    border-color: rgba(220, 53, 69, 0.3);
+    color: #f87171;
+}
+
+/* ---- Spinner ---- */
+
+.spinner-border-sm {
+    width: 0.875rem;
+    height: 0.875rem;
+    border-width: 0.15em;
+}
+
+/* ---- Scrollbar ---- */
+
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border-subtle);
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--text-secondary);
+}
+
+/* ---- Responsive ---- */
+
+@media (max-width: 768px) {
+    .sidebar {
+        position: static;
+        width: 100%;
+        min-height: auto;
+        border-right: none;
+        border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .sidebar .nav {
+        flex-direction: row !important;
+        flex-wrap: wrap;
+    }
+
+    .sidebar .mt-auto {
+        display: none;
+    }
+
+    .main-content {
+        margin-left: 0;
+    }
+}

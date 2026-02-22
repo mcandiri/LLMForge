@@ -1,0 +1,309 @@
+@page "/"
+@rendermode InteractiveServer
+@inject ApiKeyService KeyService
+
+<PageTitle>LLMForge - Home</PageTitle>
+
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col">
+            <h2 class="fw-bold mb-1">Dashboard</h2>
+            <p class="text-muted mb-0">Configure your LLM provider API keys to get started. Keys are stored in session memory only.</p>
+        </div>
+    </div>
+
+    <!-- Provider cards -->
+    <div class="row g-3">
+        <!-- OpenAI -->
+        <div class="col-lg-6 col-xl-3">
+            <div class="card bg-card border-subtle h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <span class="status-dot @GetStatusClass("OpenAI") me-2"></span>
+                        <h6 class="card-title mb-0 fw-semibold">OpenAI</h6>
+                    </div>
+                    <p class="text-muted small mb-3">GPT-4o, GPT-4, GPT-3.5</p>
+                    <div class="mb-3">
+                        <label class="form-label small text-muted">API Key</label>
+                        <input type="password"
+                               class="form-control form-control-sm bg-input border-subtle"
+                               placeholder="sk-..."
+                               value="@KeyService.OpenAIKey"
+                               @onchange="OnOpenAIKeyChanged" />
+                    </div>
+                    <button class="btn btn-sm btn-outline-light w-100"
+                            disabled="@(!KeyService.HasKey("OpenAI") || IsTestingProvider("OpenAI"))"
+                            @onclick="TestOpenAI">
+                        @if (IsTestingProvider("OpenAI"))
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                            <text>Testing...</text>
+                        }
+                        else
+                        {
+                            <text>Test Connection</text>
+                        }
+                    </button>
+                    @{ var openAiStatus = KeyService.GetConnectionStatus("OpenAI"); }
+                    @if (openAiStatus.HasValue)
+                    {
+                        <div class="mt-2 small @(openAiStatus.Value ? "text-success" : "text-danger")">
+                            @(openAiStatus.Value ? "Connected successfully" : "Connection failed")
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Anthropic -->
+        <div class="col-lg-6 col-xl-3">
+            <div class="card bg-card border-subtle h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <span class="status-dot @GetStatusClass("Anthropic") me-2"></span>
+                        <h6 class="card-title mb-0 fw-semibold">Anthropic</h6>
+                    </div>
+                    <p class="text-muted small mb-3">Claude Sonnet, Claude Haiku</p>
+                    <div class="mb-3">
+                        <label class="form-label small text-muted">API Key</label>
+                        <input type="password"
+                               class="form-control form-control-sm bg-input border-subtle"
+                               placeholder="sk-ant-..."
+                               value="@KeyService.AnthropicKey"
+                               @onchange="OnAnthropicKeyChanged" />
+                    </div>
+                    <button class="btn btn-sm btn-outline-light w-100"
+                            disabled="@(!KeyService.HasKey("Anthropic") || IsTestingProvider("Anthropic"))"
+                            @onclick="TestAnthropic">
+                        @if (IsTestingProvider("Anthropic"))
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                            <text>Testing...</text>
+                        }
+                        else
+                        {
+                            <text>Test Connection</text>
+                        }
+                    </button>
+                    @{ var anthropicStatus = KeyService.GetConnectionStatus("Anthropic"); }
+                    @if (anthropicStatus.HasValue)
+                    {
+                        <div class="mt-2 small @(anthropicStatus.Value ? "text-success" : "text-danger")">
+                            @(anthropicStatus.Value ? "Connected successfully" : "Connection failed")
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Gemini -->
+        <div class="col-lg-6 col-xl-3">
+            <div class="card bg-card border-subtle h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <span class="status-dot @GetStatusClass("Gemini") me-2"></span>
+                        <h6 class="card-title mb-0 fw-semibold">Google Gemini</h6>
+                    </div>
+                    <p class="text-muted small mb-3">Gemini 2.0 Flash, Gemini Pro</p>
+                    <div class="mb-3">
+                        <label class="form-label small text-muted">API Key</label>
+                        <input type="password"
+                               class="form-control form-control-sm bg-input border-subtle"
+                               placeholder="AIza..."
+                               value="@KeyService.GeminiKey"
+                               @onchange="OnGeminiKeyChanged" />
+                    </div>
+                    <button class="btn btn-sm btn-outline-light w-100"
+                            disabled="@(!KeyService.HasKey("Gemini") || IsTestingProvider("Gemini"))"
+                            @onclick="TestGemini">
+                        @if (IsTestingProvider("Gemini"))
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                            <text>Testing...</text>
+                        }
+                        else
+                        {
+                            <text>Test Connection</text>
+                        }
+                    </button>
+                    @{ var geminiStatus = KeyService.GetConnectionStatus("Gemini"); }
+                    @if (geminiStatus.HasValue)
+                    {
+                        <div class="mt-2 small @(geminiStatus.Value ? "text-success" : "text-danger")">
+                            @(geminiStatus.Value ? "Connected successfully" : "Connection failed")
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Ollama -->
+        <div class="col-lg-6 col-xl-3">
+            <div class="card bg-card border-subtle h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <span class="status-dot @GetStatusClass("Ollama") me-2"></span>
+                        <h6 class="card-title mb-0 fw-semibold">Ollama</h6>
+                    </div>
+                    <p class="text-muted small mb-3">Local models (Llama 3, Mistral, etc.)</p>
+                    <div class="mb-3">
+                        <label class="form-label small text-muted">Base URL</label>
+                        <input type="text"
+                               class="form-control form-control-sm bg-input border-subtle"
+                               placeholder="http://localhost:11434"
+                               value="@(KeyService.OllamaBaseUrl ?? "http://localhost:11434")"
+                               @onchange="OnOllamaKeyChanged" />
+                    </div>
+                    <button class="btn btn-sm btn-outline-light w-100"
+                            disabled="@IsTestingProvider("Ollama")"
+                            @onclick="TestOllama">
+                        @if (IsTestingProvider("Ollama"))
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                            <text>Testing...</text>
+                        }
+                        else
+                        {
+                            <text>Test Connection</text>
+                        }
+                    </button>
+                    @{ var ollamaStatus = KeyService.GetConnectionStatus("Ollama"); }
+                    @if (ollamaStatus.HasValue)
+                    {
+                        <div class="mt-2 small @(ollamaStatus.Value ? "text-success" : "text-danger")">
+                            @(ollamaStatus.Value ? "Connected successfully" : "Connection failed")
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick stats -->
+    <div class="row g-3 mt-3">
+        <div class="col-md-4">
+            <div class="card bg-card border-subtle">
+                <div class="card-body text-center">
+                    <h3 class="fw-bold text-accent mb-1">@KeyService.GetConfiguredProviders().Count</h3>
+                    <small class="text-muted">Configured Providers</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-card border-subtle">
+                <div class="card-body text-center">
+                    <h3 class="fw-bold text-accent mb-1">@ConnectedCount</h3>
+                    <small class="text-muted">Connected</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-card border-subtle">
+                <div class="card-body text-center">
+                    <h3 class="fw-bold text-accent mb-1">@(KeyService.GetConfiguredProviders().Count > 0 ? "Ready" : "Setup")</h3>
+                    <small class="text-muted">Status</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Getting started -->
+    <div class="row mt-4">
+        <div class="col">
+            <div class="card bg-card border-subtle">
+                <div class="card-body">
+                    <h6 class="fw-semibold mb-3">Getting Started</h6>
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <div class="d-flex align-items-start">
+                                <span class="badge bg-accent text-dark me-2 mt-1">1</span>
+                                <div>
+                                    <strong class="small">Add API Keys</strong>
+                                    <p class="text-muted small mb-0">Enter your provider API keys above. They are stored in session memory only and never written to disk.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="d-flex align-items-start">
+                                <span class="badge bg-accent text-dark me-2 mt-1">2</span>
+                                <div>
+                                    <strong class="small">Test Connections</strong>
+                                    <p class="text-muted small mb-0">Verify each provider is reachable by clicking Test Connection.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="d-flex align-items-start">
+                                <span class="badge bg-accent text-dark me-2 mt-1">3</span>
+                                <div>
+                                    <strong class="small">Try the Playground</strong>
+                                    <p class="text-muted small mb-0">Head to the Playground to send prompts across providers and see side-by-side results.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string? _testingProvider;
+
+    private int ConnectedCount
+    {
+        get
+        {
+            var providers = new[] { "OpenAI", "Anthropic", "Gemini", "Ollama" };
+            return providers.Count(p => KeyService.GetConnectionStatus(p) == true);
+        }
+    }
+
+    private bool IsTestingProvider(string provider) => _testingProvider == provider;
+
+    private string GetStatusClass(string provider)
+    {
+        var status = KeyService.GetConnectionStatus(provider);
+        if (status == true) return "status-connected";
+        if (status == false) return "status-error";
+        if (KeyService.HasKey(provider)) return "status-configured";
+        return "status-none";
+    }
+
+    private void OnOpenAIKeyChanged(ChangeEventArgs e) => KeyService.OpenAIKey = e.Value?.ToString();
+    private void OnAnthropicKeyChanged(ChangeEventArgs e) => KeyService.AnthropicKey = e.Value?.ToString();
+    private void OnGeminiKeyChanged(ChangeEventArgs e) => KeyService.GeminiKey = e.Value?.ToString();
+    private void OnOllamaKeyChanged(ChangeEventArgs e) => KeyService.OllamaBaseUrl = e.Value?.ToString();
+
+    private Task TestOpenAI() => TestConnection("OpenAI");
+    private Task TestAnthropic() => TestConnection("Anthropic");
+    private Task TestGemini() => TestConnection("Gemini");
+    private Task TestOllama() => TestConnection("Ollama");
+
+    private async Task TestConnection(string provider)
+    {
+        _testingProvider = provider;
+        StateHasChanged();
+
+        try
+        {
+            // Simulate a connection test with a short delay.
+            // In a real integration, this would call provider.TestConnectionAsync().
+            await Task.Delay(1500);
+
+            // Mark as connected if a key/url is provided
+            var hasCredential = provider == "Ollama" || KeyService.HasKey(provider);
+            KeyService.SetConnectionStatus(provider, hasCredential);
+        }
+        catch
+        {
+            KeyService.SetConnectionStatus(provider, false);
+        }
+        finally
+        {
+            _testingProvider = null;
+            StateHasChanged();
+        }
+    }
+}

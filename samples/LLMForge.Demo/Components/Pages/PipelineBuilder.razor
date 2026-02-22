@@ -1,0 +1,485 @@
+@page "/pipeline"
+@rendermode InteractiveServer
+@inject ApiKeyService KeyService
+@inject IForgeOrchestrator Orchestrator
+@inject OrchestrationHistoryService History
+
+<PageTitle>LLMForge - Pipeline Builder</PageTitle>
+
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col">
+            <h2 class="fw-bold mb-1">Pipeline Builder</h2>
+            <p class="text-muted mb-0">Build a custom orchestration pipeline with validators, scorers, and consensus strategies.</p>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <!-- Configuration panel -->
+        <div class="col-lg-5">
+            <!-- Step 1: Prompts -->
+            <div class="card bg-card border-subtle mb-3">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <span class="badge bg-accent text-dark me-2">1</span>
+                        <h6 class="mb-0 fw-semibold">Prompts</h6>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small text-muted">System Prompt</label>
+                        <textarea class="form-control bg-input border-subtle" rows="2"
+                                  placeholder="You are a helpful assistant..."
+                                  @bind="_systemPrompt"></textarea>
+                    </div>
+                    <div>
+                        <label class="form-label small text-muted">User Prompt</label>
+                        <textarea class="form-control bg-input border-subtle" rows="3"
+                                  placeholder="Enter your prompt..."
+                                  @bind="_userPrompt"></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 2: Validators -->
+            <div class="card bg-card border-subtle mb-3">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <span class="badge bg-accent text-dark me-2">2</span>
+                        <h6 class="mb-0 fw-semibold">Validators</h6>
+                    </div>
+                    <div class="d-flex flex-wrap gap-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="valJson"
+                                   checked="@_validateJson" @onchange="OnValidateJsonChanged" />
+                            <label class="form-check-label small" for="valJson">Valid JSON</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="valMinLen"
+                                   checked="@_validateMinLength" @onchange="OnValidateMinLenChanged" />
+                            <label class="form-check-label small" for="valMinLen">Min Length</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="valMaxLen"
+                                   checked="@_validateMaxLength" @onchange="OnValidateMaxLenChanged" />
+                            <label class="form-check-label small" for="valMaxLen">Max Length</label>
+                        </div>
+                    </div>
+                    @if (_validateMinLength)
+                    {
+                        <div class="mt-2">
+                            <label class="form-label small text-muted">Minimum Characters: @_minLength</label>
+                            <input type="range" class="form-range" min="10" max="1000" step="10"
+                                   value="@_minLength" @onchange="OnMinLengthChanged" />
+                        </div>
+                    }
+                    @if (_validateMaxLength)
+                    {
+                        <div class="mt-2">
+                            <label class="form-label small text-muted">Maximum Characters: @_maxLength</label>
+                            <input type="range" class="form-range" min="100" max="10000" step="100"
+                                   value="@_maxLength" @onchange="OnMaxLengthChanged" />
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Step 3: Scoring Weights -->
+            <div class="card bg-card border-subtle mb-3">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <span class="badge bg-accent text-dark me-2">3</span>
+                        <h6 class="mb-0 fw-semibold">Scoring Weights</h6>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between">
+                            <label class="form-label small text-muted mb-1">Response Time</label>
+                            <small class="text-accent">@_weightResponseTime.ToString("F1")</small>
+                        </div>
+                        <input type="range" class="form-range" min="0" max="2" step="0.1"
+                               value="@_weightResponseTime"
+                               @onchange="OnWeightResponseTimeChanged" />
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between">
+                            <label class="form-label small text-muted mb-1">Token Efficiency</label>
+                            <small class="text-accent">@_weightTokenEfficiency.ToString("F1")</small>
+                        </div>
+                        <input type="range" class="form-range" min="0" max="2" step="0.1"
+                               value="@_weightTokenEfficiency"
+                               @onchange="OnWeightTokenEfficiencyChanged" />
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between">
+                            <label class="form-label small text-muted mb-1">Consensus Alignment</label>
+                            <small class="text-accent">@_weightConsensus.ToString("F1")</small>
+                        </div>
+                        <input type="range" class="form-range" min="0" max="2" step="0.1"
+                               value="@_weightConsensus"
+                               @onchange="OnWeightConsensusChanged" />
+                    </div>
+
+                    @if (_validateJson || _validateMinLength || _validateMaxLength)
+                    {
+                        <div class="mb-0">
+                            <div class="d-flex justify-content-between">
+                                <label class="form-label small text-muted mb-1">Validation Pass</label>
+                                <small class="text-accent">@_weightValidation.ToString("F1")</small>
+                            </div>
+                            <input type="range" class="form-range" min="0" max="2" step="0.1"
+                                   value="@_weightValidation"
+                                   @onchange="OnWeightValidationChanged" />
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Step 4: Consensus -->
+            <div class="card bg-card border-subtle mb-3">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <span class="badge bg-accent text-dark me-2">4</span>
+                        <h6 class="mb-0 fw-semibold">Consensus Strategy</h6>
+                    </div>
+                    <select class="form-select form-select-sm bg-input border-subtle" @bind="_consensusStrategy">
+                        <option value="HighestScore">Highest Score</option>
+                        <option value="MajorityVote">Majority Vote</option>
+                        <option value="Quorum">Quorum</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Run button -->
+            <button class="btn btn-accent w-100 py-2"
+                    disabled="@(string.IsNullOrWhiteSpace(_userPrompt) || _isRunning)"
+                    @onclick="RunPipeline">
+                @if (_isRunning)
+                {
+                    <span class="spinner-border spinner-border-sm me-1"></span>
+                    <text>Executing Pipeline...</text>
+                }
+                else
+                {
+                    <text>Execute Pipeline</text>
+                }
+            </button>
+        </div>
+
+        <!-- Results / Execution Log -->
+        <div class="col-lg-7">
+            @if (_logEntries.Count > 0 || _pipelineResult != null)
+            {
+                <!-- Execution Log -->
+                <div class="card bg-card border-subtle mb-3">
+                    <div class="card-body">
+                        <h6 class="fw-semibold mb-3">Execution Log</h6>
+                        <div class="execution-log">
+                            @foreach (var entry in _logEntries)
+                            {
+                                <div class="log-entry d-flex gap-2 small mb-1">
+                                    <span class="text-muted" style="min-width: 80px;">@entry.Timestamp.ToString("HH:mm:ss.fff")</span>
+                                    <span class="badge @GetLogBadgeClass(entry.Level) align-self-start" style="min-width: 50px;">@entry.Level</span>
+                                    <span class="@GetLogTextClass(entry.Level)">@entry.Message</span>
+                                </div>
+                            }
+                            @if (_isRunning)
+                            {
+                                <div class="log-entry d-flex gap-2 small mb-1">
+                                    <span class="text-muted" style="min-width: 80px;">
+                                        <span class="spinner-border spinner-border-sm"></span>
+                                    </span>
+                                    <span class="text-muted">Processing...</span>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pipeline result -->
+                @if (_pipelineResult != null)
+                {
+                    <div class="card bg-card @(_pipelineResult.IsSuccess ? "border-accent" : "border-danger") mb-3">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h6 class="fw-semibold mb-0">
+                                    @(_pipelineResult.IsSuccess ? "Pipeline Succeeded" : "Pipeline Failed")
+                                </h6>
+                                <span class="badge @(_pipelineResult.IsSuccess ? "bg-success" : "bg-danger")">
+                                    @(_pipelineResult.ExecutionTime.TotalMilliseconds.ToString("F0"))ms
+                                </span>
+                            </div>
+
+                            @if (_pipelineResult.IsSuccess)
+                            {
+                                <div class="mb-2 small">
+                                    <span class="text-muted">Best Provider:</span>
+                                    <span class="fw-semibold ms-1">@_pipelineResult.BestProvider</span>
+                                    <span class="text-muted ms-3">Score:</span>
+                                    <span class="fw-semibold ms-1">@_pipelineResult.BestScore.ToString("F2")</span>
+                                </div>
+                                <div class="response-content small">
+                                    <pre class="mb-0 text-light">@_pipelineResult.BestResponse</pre>
+                                </div>
+                            }
+                            else
+                            {
+                                <p class="text-danger small mb-0">@_pipelineResult.FailureReason</p>
+                            }
+                        </div>
+                    </div>
+
+                    <!-- All responses -->
+                    @if (_pipelineResult.AllResponses.Count > 0)
+                    {
+                        <div class="row g-3">
+                            @foreach (var resp in _pipelineResult.AllResponses.OrderByDescending(r => r.Score))
+                            {
+                                var isWinner = resp.ProviderName == _pipelineResult.BestProvider;
+                                <div class="col-12">
+                                    <div class="card bg-card border-subtle">
+                                        <div class="card-body">
+                                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <span class="fw-semibold small">@resp.ProviderName</span>
+                                                    @if (isWinner)
+                                                    {
+                                                        <span class="badge bg-accent text-dark">Winner</span>
+                                                    }
+                                                </div>
+                                                <div class="d-flex gap-2">
+                                                    <small class="text-muted">@(resp.ResponseTime.TotalMilliseconds.ToString("F0"))ms</small>
+                                                    <small class="text-muted">@resp.TotalTokens tok</small>
+                                                    <small class="fw-semibold">@resp.Score.ToString("F2")</small>
+                                                </div>
+                                            </div>
+                                            <div class="score-bar-container mb-2">
+                                                <div class="score-bar @(isWinner ? "score-bar-winner" : "")"
+                                                     style="width: @((resp.Score * 100).ToString("F0"))%"></div>
+                                            </div>
+                                            <div class="response-content small">
+                                                <pre class="mb-0 text-light" style="max-height: 120px; overflow-y: auto;">@resp.Content</pre>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                }
+            }
+            else
+            {
+                <div class="card bg-card border-subtle h-100">
+                    <div class="card-body d-flex align-items-center justify-content-center text-center" style="min-height: 400px;">
+                        <div>
+                            <h5 class="text-muted mb-2">Pipeline not executed</h5>
+                            <p class="text-secondary small">Configure your pipeline steps on the left, then click Execute Pipeline.</p>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private string _systemPrompt = string.Empty;
+    private string _userPrompt = string.Empty;
+    private string _consensusStrategy = "HighestScore";
+
+    // Validators
+    private bool _validateJson;
+    private bool _validateMinLength;
+    private bool _validateMaxLength;
+    private int _minLength = 50;
+    private int _maxLength = 5000;
+
+    // Scoring weights
+    private double _weightResponseTime = 0.3;
+    private double _weightTokenEfficiency = 0.3;
+    private double _weightConsensus = 0.7;
+    private double _weightValidation = 1.0;
+
+    // State
+    private bool _isRunning;
+    private OrchestrationResult? _pipelineResult;
+    private readonly List<LogEntry> _logEntries = new();
+
+    // Event handlers for checkboxes
+    private void OnValidateJsonChanged(ChangeEventArgs e) => _validateJson = (bool)(e.Value ?? false);
+    private void OnValidateMinLenChanged(ChangeEventArgs e) => _validateMinLength = (bool)(e.Value ?? false);
+    private void OnValidateMaxLenChanged(ChangeEventArgs e) => _validateMaxLength = (bool)(e.Value ?? false);
+
+    // Event handlers for range inputs
+    private void OnMinLengthChanged(ChangeEventArgs e) => _minLength = int.TryParse(e.Value?.ToString(), out var v) ? v : 50;
+    private void OnMaxLengthChanged(ChangeEventArgs e) => _maxLength = int.TryParse(e.Value?.ToString(), out var v) ? v : 5000;
+    private void OnWeightResponseTimeChanged(ChangeEventArgs e) => _weightResponseTime = double.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : 0.3;
+    private void OnWeightTokenEfficiencyChanged(ChangeEventArgs e) => _weightTokenEfficiency = double.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : 0.3;
+    private void OnWeightConsensusChanged(ChangeEventArgs e) => _weightConsensus = double.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : 0.7;
+    private void OnWeightValidationChanged(ChangeEventArgs e) => _weightValidation = double.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : 1.0;
+
+    private void AddLog(string level, string message)
+    {
+        _logEntries.Add(new LogEntry
+        {
+            Timestamp = DateTime.Now,
+            Level = level,
+            Message = message
+        });
+        StateHasChanged();
+    }
+
+    private string GetLogBadgeClass(string level) => level switch
+    {
+        "INFO" => "bg-info",
+        "OK" => "bg-success",
+        "WARN" => "bg-warning text-dark",
+        "ERR" => "bg-danger",
+        _ => "bg-secondary"
+    };
+
+    private string GetLogTextClass(string level) => level switch
+    {
+        "ERR" => "text-danger",
+        "WARN" => "text-warning",
+        "OK" => "text-success",
+        _ => "text-light"
+    };
+
+    private async Task RunPipeline()
+    {
+        if (string.IsNullOrWhiteSpace(_userPrompt)) return;
+
+        _isRunning = true;
+        _pipelineResult = null;
+        _logEntries.Clear();
+        StateHasChanged();
+
+        try
+        {
+            AddLog("INFO", "Starting pipeline execution...");
+
+            var pipeline = Orchestrator.CreatePipeline();
+
+            // Step 1: Set prompts
+            if (!string.IsNullOrWhiteSpace(_systemPrompt))
+            {
+                pipeline.WithSystemPrompt(_systemPrompt);
+                AddLog("INFO", $"System prompt set ({_systemPrompt.Length} chars)");
+            }
+
+            pipeline.WithPrompt(_userPrompt);
+            AddLog("INFO", $"User prompt set ({_userPrompt.Length} chars)");
+
+            // Step 2: Configure providers
+            pipeline.ExecuteOn(p => p.All());
+            AddLog("INFO", "Executing on all configured providers");
+
+            // Step 3: Add validators
+            if (_validateJson || _validateMinLength || _validateMaxLength)
+            {
+                pipeline.ValidateWith(v =>
+                {
+                    if (_validateJson) v.MustBeValidJson();
+                    if (_validateMinLength) v.MinLength(_minLength);
+                    if (_validateMaxLength) v.MaxLength(_maxLength);
+                });
+
+                if (_validateJson) AddLog("INFO", "Validator added: JSON validation");
+                if (_validateMinLength) AddLog("INFO", $"Validator added: Min length ({_minLength})");
+                if (_validateMaxLength) AddLog("INFO", $"Validator added: Max length ({_maxLength})");
+            }
+
+            // Step 4: Configure scoring
+            pipeline.ScoreWith(s =>
+            {
+                if (_weightResponseTime > 0)
+                    s.ResponseTime(_weightResponseTime);
+                if (_weightTokenEfficiency > 0)
+                    s.TokenEfficiency(_weightTokenEfficiency);
+                if (_weightConsensus > 0)
+                    s.ConsensusAlignment(_weightConsensus);
+                if ((_validateJson || _validateMinLength || _validateMaxLength) && _weightValidation > 0)
+                    s.ValidationScore(_weightValidation);
+            });
+            AddLog("INFO", $"Scoring configured (RT:{_weightResponseTime:F1} TE:{_weightTokenEfficiency:F1} CA:{_weightConsensus:F1})");
+
+            // Step 5: Set consensus
+            var consensus = _consensusStrategy switch
+            {
+                "MajorityVote" => LLMForge.Configuration.ConsensusStrategy.MajorityVote,
+                "Quorum" => LLMForge.Configuration.ConsensusStrategy.Quorum,
+                _ => LLMForge.Configuration.ConsensusStrategy.HighestScore
+            };
+            pipeline.SelectBy(consensus);
+            AddLog("INFO", $"Consensus strategy: {_consensusStrategy}");
+
+            // Execute
+            AddLog("INFO", "Executing pipeline...");
+            _pipelineResult = await pipeline.ExecuteAsync();
+
+            if (_pipelineResult.IsSuccess)
+            {
+                AddLog("OK", $"Pipeline completed successfully in {_pipelineResult.ExecutionTime.TotalMilliseconds:F0}ms");
+                AddLog("OK", $"Winner: {_pipelineResult.BestProvider} (score: {_pipelineResult.BestScore:F2})");
+
+                // Record to history
+                History.AddRecord(new OrchestrationRecord
+                {
+                    Prompt = _userPrompt,
+                    SystemPrompt = string.IsNullOrWhiteSpace(_systemPrompt) ? null : _systemPrompt,
+                    BestProvider = _pipelineResult.BestProvider,
+                    BestResponse = _pipelineResult.BestResponse,
+                    BestScore = _pipelineResult.BestScore,
+                    ExecutionTime = _pipelineResult.ExecutionTime,
+                    TotalModels = _pipelineResult.TotalModels,
+                    ConsensusReached = _pipelineResult.ConsensusReached,
+                    Responses = _pipelineResult.AllResponses.Select(r => new ResponseSummary
+                    {
+                        Provider = r.ProviderName,
+                        Content = r.Content,
+                        Score = r.Score,
+                        ResponseTime = r.ResponseTime,
+                        Tokens = r.TotalTokens,
+                        IsWinner = r.ProviderName == _pipelineResult.BestProvider
+                    }).ToList()
+                });
+            }
+            else
+            {
+                AddLog("ERR", $"Pipeline failed: {_pipelineResult.FailureReason}");
+            }
+
+            // Log pipeline events
+            foreach (var evt in _pipelineResult.PipelineEvents)
+            {
+                AddLog("INFO", $"[{evt.StepName}] {evt.Message}");
+            }
+
+            if (_pipelineResult.Failures.Count > 0)
+            {
+                foreach (var failure in _pipelineResult.Failures)
+                {
+                    AddLog("WARN", $"Provider {failure.Provider} failed: {failure.Error}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            AddLog("ERR", $"Pipeline exception: {ex.Message}");
+        }
+        finally
+        {
+            _isRunning = false;
+            StateHasChanged();
+        }
+    }
+
+    private class LogEntry
+    {
+        public DateTime Timestamp { get; set; }
+        public string Level { get; set; } = "INFO";
+        public string Message { get; set; } = string.Empty;
+    }
+}
