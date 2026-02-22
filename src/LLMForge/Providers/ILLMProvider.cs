@@ -1,3 +1,4 @@
+using System.Net;
 using LLMForge.Configuration;
 
 namespace LLMForge.Providers;
@@ -93,4 +94,14 @@ public class LLMResponse
     /// Gets or sets the error message if the response failed.
     /// </summary>
     public string? Error { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether this response was rate-limited (HTTP 429).
+    /// </summary>
+    public bool IsRateLimited { get; set; }
+
+    /// <summary>
+    /// Gets or sets the HTTP status code from the provider response, if available.
+    /// </summary>
+    public HttpStatusCode? HttpStatusCode { get; set; }
 }

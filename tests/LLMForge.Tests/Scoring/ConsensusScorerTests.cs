@@ -36,8 +36,8 @@ public class ConsensusScorerTests
         // Act
         var score = await _sut.ScoreAsync(response, allResponses);
 
-        // Assert
-        score.Should().Be(1.0);
+        // Assert — TF-IDF cosine similarity is ~1.0 for identical texts (floating point tolerance)
+        score.Should().BeApproximately(1.0, 0.001);
     }
 
     [Fact]

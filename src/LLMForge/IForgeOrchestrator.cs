@@ -76,6 +76,13 @@ public class OrchestrationOptions
 
     /// <summary>Gets or sets an optional system prompt.</summary>
     public string? SystemPrompt { get; set; }
+
+    /// <summary>
+    /// Gets or sets per-call scoring weight overrides.
+    /// Keys are scorer names (e.g., "ResponseTime", "Consensus"), values are weights.
+    /// When null, falls back to <see cref="Configuration.ForgeOptions.DefaultScoringWeights"/>.
+    /// </summary>
+    public Dictionary<string, double>? ScoringWeights { get; set; }
 }
 
 /// <summary>

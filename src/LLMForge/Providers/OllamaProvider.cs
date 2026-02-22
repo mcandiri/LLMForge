@@ -52,7 +52,7 @@ public class OllamaProvider : BaseLLMProvider
         var response = await HttpClient.SendAsync(request, cancellationToken);
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
 
-        response.EnsureSuccessStatusCode();
+        ThrowIfNotSuccess(response, json);
 
         using var doc = JsonDocument.Parse(json);
         var root = doc.RootElement;

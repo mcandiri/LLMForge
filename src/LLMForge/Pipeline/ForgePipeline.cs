@@ -2,6 +2,7 @@ using LLMForge.Configuration;
 using LLMForge.Consensus;
 using LLMForge.Execution;
 using LLMForge.Providers;
+using LLMForge.Resilience;
 using LLMForge.Retry;
 using LLMForge.Scoring;
 using LLMForge.Validation;
@@ -93,6 +94,7 @@ public class ForgePipeline : IForgePipeline
         {
             Configuration.RetryPolicy.ExponentialBackoff => new ExponentialBackoffPolicy(),
             Configuration.RetryPolicy.FixedDelay => new FixedDelayPolicy(),
+            Configuration.RetryPolicy.RateLimitAware => new RateLimitAwareRetryPolicy(),
             _ => null
         };
 
