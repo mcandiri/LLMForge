@@ -1,8 +1,9 @@
 @page "/pipeline"
 @rendermode InteractiveServer
 @inject ApiKeyService KeyService
-@inject IForgeOrchestrator Orchestrator
 @inject OrchestrationHistoryService History
+@inject IHttpClientFactory HttpClientFactory
+@inject ILoggerFactory LoggerFactory
 
 <PageTitle>LLMForge - Pipeline Builder</PageTitle>
 
@@ -49,17 +50,17 @@
                     <div class="d-flex flex-wrap gap-3">
                         <div class="form-check">
                             <input class="form-check-input" type="checkbox" id="valJson"
-                                   checked="@_validateJson" @onchange="OnValidateJsonChanged" />
+                                   checked="@_validateJson" @onchange="e => _validateJson = (bool)(e.Value ?? false)" />
                             <label class="form-check-label small" for="valJson">Valid JSON</label>
                         </div>
                         <div class="form-check">
                             <input class="form-check-input" type="checkbox" id="valMinLen"
-                                   checked="@_validateMinLength" @onchange="OnValidateMinLenChanged" />
+                                   checked="@_validateMinLength" @onchange="e => _validateMinLength = (bool)(e.Value ?? false)" />
                             <label class="form-check-label small" for="valMinLen">Min Length</label>
                         </div>
                         <div class="form-check">
                             <input class="form-check-input" type="checkbox" id="valMaxLen"
-                                   checked="@_validateMaxLength" @onchange="OnValidateMaxLenChanged" />
+                                   checked="@_validateMaxLength" @onchange="e => _validateMaxLength = (bool)(e.Value ?? false)" />
                             <label class="form-check-label small" for="valMaxLen">Max Length</label>
                         </div>
                     </div>
@@ -68,7 +69,7 @@
                         <div class="mt-2">
                             <label class="form-label small text-muted">Minimum Characters: @_minLength</label>
                             <input type="range" class="form-range" min="10" max="1000" step="10"
-                                   value="@_minLength" @onchange="OnMinLengthChanged" />
+                                   value="@_minLength" @onchange="e => _minLength = int.TryParse(e.Value?.ToString(), out var v) ? v : 50" />
                         </div>
                     }
                     @if (_validateMaxLength)
@@ -76,7 +77,7 @@
                         <div class="mt-2">
                             <label class="form-label small text-muted">Maximum Characters: @_maxLength</label>
                             <input type="range" class="form-range" min="100" max="10000" step="100"
-                                   value="@_maxLength" @onchange="OnMaxLengthChanged" />
+                                   value="@_maxLength" @onchange="e => _maxLength = int.TryParse(e.Value?.ToString(), out var v) ? v : 5000" />
                         </div>
                     }
                 </div>
@@ -97,7 +98,7 @@
                         </div>
                         <input type="range" class="form-range" min="0" max="2" step="0.1"
                                value="@_weightResponseTime"
-                               @onchange="OnWeightResponseTimeChanged" />
+                               @onchange="e => _weightResponseTime = double.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : 0.3" />
                     </div>
 
                     <div class="mb-3">
@@ -107,7 +108,7 @@
                         </div>
                         <input type="range" class="form-range" min="0" max="2" step="0.1"
                                value="@_weightTokenEfficiency"
-                               @onchange="OnWeightTokenEfficiencyChanged" />
+                               @onchange="e => _weightTokenEfficiency = double.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : 0.3" />
                     </div>
 
                     <div class="mb-3">
@@ -117,7 +118,7 @@
                         </div>
                         <input type="range" class="form-range" min="0" max="2" step="0.1"
                                value="@_weightConsensus"
-                               @onchange="OnWeightConsensusChanged" />
+                               @onchange="e => _weightConsensus = double.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : 0.7" />
                     </div>
 
                     @if (_validateJson || _validateMinLength || _validateMaxLength)
@@ -129,7 +130,7 @@
                             </div>
                             <input type="range" class="form-range" min="0" max="2" step="0.1"
                                    value="@_weightValidation"
-                                   @onchange="OnWeightValidationChanged" />
+                                   @onchange="e => _weightValidation = double.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : 1.0" />
                         </div>
                     }
                 </div>
@@ -152,7 +153,7 @@
 
             <!-- Run button -->
             <button class="btn btn-accent w-100 py-2"
-                    disabled="@(string.IsNullOrWhiteSpace(_userPrompt) || _isRunning)"
+                    disabled="@(string.IsNullOrWhiteSpace(_userPrompt) || _isRunning || !HasConfiguredProviders)"
                     @onclick="RunPipeline">
                 @if (_isRunning)
                 {
@@ -164,6 +165,13 @@
                     <text>Execute Pipeline</text>
                 }
             </button>
+
+            @if (!HasConfiguredProviders)
+            {
+                <div class="alert alert-warning small mt-2 mb-0 py-2">
+                    No API keys configured. Go to <a href="/">Home</a> to add your keys first.
+                </div>
+            }
         </div>
 
         <!-- Results / Execution Log -->
@@ -306,45 +314,69 @@
     private OrchestrationResult? _pipelineResult;
     private readonly List<LogEntry> _logEntries = new();
 
-    // Event handlers for checkboxes
-    private void OnValidateJsonChanged(ChangeEventArgs e) => _validateJson = (bool)(e.Value ?? false);
-    private void OnValidateMinLenChanged(ChangeEventArgs e) => _validateMinLength = (bool)(e.Value ?? false);
-    private void OnValidateMaxLenChanged(ChangeEventArgs e) => _validateMaxLength = (bool)(e.Value ?? false);
+    private bool HasConfiguredProviders =>
+        KeyService.HasKey("OpenAI") || KeyService.HasKey("Anthropic") || KeyService.HasKey("Gemini");
 
-    // Event handlers for range inputs
-    private void OnMinLengthChanged(ChangeEventArgs e) => _minLength = int.TryParse(e.Value?.ToString(), out var v) ? v : 50;
-    private void OnMaxLengthChanged(ChangeEventArgs e) => _maxLength = int.TryParse(e.Value?.ToString(), out var v) ? v : 5000;
-    private void OnWeightResponseTimeChanged(ChangeEventArgs e) => _weightResponseTime = double.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : 0.3;
-    private void OnWeightTokenEfficiencyChanged(ChangeEventArgs e) => _weightTokenEfficiency = double.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : 0.3;
-    private void OnWeightConsensusChanged(ChangeEventArgs e) => _weightConsensus = double.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : 0.7;
-    private void OnWeightValidationChanged(ChangeEventArgs e) => _weightValidation = double.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : 1.0;
+    private LLMForge.ForgeOrchestrator BuildOrchestrator()
+    {
+        var registry = new LLMForge.Providers.ProviderRegistry();
+
+        if (KeyService.HasKey("OpenAI"))
+        {
+            var config = new LLMForge.Configuration.ModelConfig
+            {
+                ApiKey = KeyService.OpenAIKey!, Model = "gpt-4o",
+                MaxTokens = 2000, TimeoutSeconds = 30, ProviderName = "OpenAI"
+            };
+            registry.Register(new LLMForge.Providers.OpenAIProvider(
+                HttpClientFactory.CreateClient("OpenAI"), config,
+                LoggerFactory.CreateLogger<LLMForge.Providers.OpenAIProvider>()));
+        }
+
+        if (KeyService.HasKey("Anthropic"))
+        {
+            var config = new LLMForge.Configuration.ModelConfig
+            {
+                ApiKey = KeyService.AnthropicKey!, Model = "claude-sonnet-4-20250514",
+                MaxTokens = 2000, TimeoutSeconds = 30, ProviderName = "Anthropic"
+            };
+            registry.Register(new LLMForge.Providers.AnthropicProvider(
+                HttpClientFactory.CreateClient("Anthropic"), config,
+                LoggerFactory.CreateLogger<LLMForge.Providers.AnthropicProvider>()));
+        }
+
+        if (KeyService.HasKey("Gemini"))
+        {
+            var config = new LLMForge.Configuration.ModelConfig
+            {
+                ApiKey = KeyService.GeminiKey!, Model = "gemini-2.0-flash",
+                MaxTokens = 2000, TimeoutSeconds = 30, ProviderName = "Gemini"
+            };
+            registry.Register(new LLMForge.Providers.GeminiProvider(
+                HttpClientFactory.CreateClient("Gemini"), config,
+                LoggerFactory.CreateLogger<LLMForge.Providers.GeminiProvider>()));
+        }
+
+        var diagnostics = new LLMForge.Diagnostics.ForgeDiagnostics();
+        var options = new LLMForge.Configuration.ForgeOptions { EnableDiagnostics = true };
+        return new LLMForge.ForgeOrchestrator(registry, diagnostics, LoggerFactory, options);
+    }
 
     private void AddLog(string level, string message)
     {
-        _logEntries.Add(new LogEntry
-        {
-            Timestamp = DateTime.Now,
-            Level = level,
-            Message = message
-        });
+        _logEntries.Add(new LogEntry { Timestamp = DateTime.Now, Level = level, Message = message });
         StateHasChanged();
     }
 
     private string GetLogBadgeClass(string level) => level switch
     {
-        "INFO" => "bg-info",
-        "OK" => "bg-success",
-        "WARN" => "bg-warning text-dark",
-        "ERR" => "bg-danger",
-        _ => "bg-secondary"
+        "INFO" => "bg-info", "OK" => "bg-success",
+        "WARN" => "bg-warning text-dark", "ERR" => "bg-danger", _ => "bg-secondary"
     };
 
     private string GetLogTextClass(string level) => level switch
     {
-        "ERR" => "text-danger",
-        "WARN" => "text-warning",
-        "OK" => "text-success",
-        _ => "text-light"
+        "ERR" => "text-danger", "WARN" => "text-warning", "OK" => "text-success", _ => "text-light"
     };
 
     private async Task RunPipeline()
@@ -360,9 +392,9 @@
         {
             AddLog("INFO", "Starting pipeline execution...");
 
-            var pipeline = Orchestrator.CreatePipeline();
+            var orchestrator = BuildOrchestrator();
+            var pipeline = orchestrator.CreatePipeline();
 
-            // Step 1: Set prompts
             if (!string.IsNullOrWhiteSpace(_systemPrompt))
             {
                 pipeline.WithSystemPrompt(_systemPrompt);
@@ -372,11 +404,9 @@
             pipeline.WithPrompt(_userPrompt);
             AddLog("INFO", $"User prompt set ({_userPrompt.Length} chars)");
 
-            // Step 2: Configure providers
             pipeline.ExecuteOn(p => p.All());
-            AddLog("INFO", "Executing on all configured providers");
+            AddLog("INFO", $"Executing on {KeyService.GetConfiguredProviders().Count} providers");
 
-            // Step 3: Add validators
             if (_validateJson || _validateMinLength || _validateMaxLength)
             {
                 pipeline.ValidateWith(v =>
@@ -385,27 +415,21 @@
                     if (_validateMinLength) v.MinLength(_minLength);
                     if (_validateMaxLength) v.MaxLength(_maxLength);
                 });
-
-                if (_validateJson) AddLog("INFO", "Validator added: JSON validation");
-                if (_validateMinLength) AddLog("INFO", $"Validator added: Min length ({_minLength})");
-                if (_validateMaxLength) AddLog("INFO", $"Validator added: Max length ({_maxLength})");
+                if (_validateJson) AddLog("INFO", "Validator: JSON validation");
+                if (_validateMinLength) AddLog("INFO", $"Validator: Min length ({_minLength})");
+                if (_validateMaxLength) AddLog("INFO", $"Validator: Max length ({_maxLength})");
             }
 
-            // Step 4: Configure scoring
             pipeline.ScoreWith(s =>
             {
-                if (_weightResponseTime > 0)
-                    s.ResponseTime(_weightResponseTime);
-                if (_weightTokenEfficiency > 0)
-                    s.TokenEfficiency(_weightTokenEfficiency);
-                if (_weightConsensus > 0)
-                    s.ConsensusAlignment(_weightConsensus);
+                if (_weightResponseTime > 0) s.ResponseTime(_weightResponseTime);
+                if (_weightTokenEfficiency > 0) s.TokenEfficiency(_weightTokenEfficiency);
+                if (_weightConsensus > 0) s.ConsensusAlignment(_weightConsensus);
                 if ((_validateJson || _validateMinLength || _validateMaxLength) && _weightValidation > 0)
                     s.ValidationScore(_weightValidation);
             });
-            AddLog("INFO", $"Scoring configured (RT:{_weightResponseTime:F1} TE:{_weightTokenEfficiency:F1} CA:{_weightConsensus:F1})");
+            AddLog("INFO", $"Scoring: RT={_weightResponseTime:F1} TE={_weightTokenEfficiency:F1} CA={_weightConsensus:F1}");
 
-            // Step 5: Set consensus
             var consensus = _consensusStrategy switch
             {
                 "MajorityVote" => LLMForge.Configuration.ConsensusStrategy.MajorityVote,
@@ -413,18 +437,16 @@
                 _ => LLMForge.Configuration.ConsensusStrategy.HighestScore
             };
             pipeline.SelectBy(consensus);
-            AddLog("INFO", $"Consensus strategy: {_consensusStrategy}");
+            AddLog("INFO", $"Consensus: {_consensusStrategy}");
 
-            // Execute
             AddLog("INFO", "Executing pipeline...");
             _pipelineResult = await pipeline.ExecuteAsync();
 
             if (_pipelineResult.IsSuccess)
             {
-                AddLog("OK", $"Pipeline completed successfully in {_pipelineResult.ExecutionTime.TotalMilliseconds:F0}ms");
+                AddLog("OK", $"Completed in {_pipelineResult.ExecutionTime.TotalMilliseconds:F0}ms");
                 AddLog("OK", $"Winner: {_pipelineResult.BestProvider} (score: {_pipelineResult.BestScore:F2})");
 
-                // Record to history
                 History.AddRecord(new OrchestrationRecord
                 {
                     Prompt = _userPrompt,
@@ -437,11 +459,8 @@
                     ConsensusReached = _pipelineResult.ConsensusReached,
                     Responses = _pipelineResult.AllResponses.Select(r => new ResponseSummary
                     {
-                        Provider = r.ProviderName,
-                        Content = r.Content,
-                        Score = r.Score,
-                        ResponseTime = r.ResponseTime,
-                        Tokens = r.TotalTokens,
+                        Provider = r.ProviderName, Content = r.Content, Score = r.Score,
+                        ResponseTime = r.ResponseTime, Tokens = r.TotalTokens,
                         IsWinner = r.ProviderName == _pipelineResult.BestProvider
                     }).ToList()
                 });
@@ -451,23 +470,15 @@
                 AddLog("ERR", $"Pipeline failed: {_pipelineResult.FailureReason}");
             }
 
-            // Log pipeline events
             foreach (var evt in _pipelineResult.PipelineEvents)
-            {
                 AddLog("INFO", $"[{evt.StepName}] {evt.Message}");
-            }
 
-            if (_pipelineResult.Failures.Count > 0)
-            {
-                foreach (var failure in _pipelineResult.Failures)
-                {
-                    AddLog("WARN", $"Provider {failure.Provider} failed: {failure.Error}");
-                }
-            }
+            foreach (var failure in _pipelineResult.Failures)
+                AddLog("WARN", $"{failure.Provider}: {failure.Error}");
         }
         catch (Exception ex)
         {
-            AddLog("ERR", $"Pipeline exception: {ex.Message}");
+            AddLog("ERR", $"Exception: {ex.Message}");
         }
         finally
         {
