@@ -1,6 +1,6 @@
 # LLMForge
 
-> Production-grade LLM orchestration for .NET — because one model's answer isn't always enough.
+> Multi-provider LLM orchestration toolkit for .NET — because one model's answer isn't always enough.
 
 [![.NET 8](https://img.shields.io/badge/.NET-8.0-512BD4?style=flat&logo=dotnet)](https://dotnet.microsoft.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -47,22 +47,26 @@ Multiple models. Validated responses. Weighted scoring. Consensus-based selectio
 
 ---
 
-## Features
+## Core Features
 
-- **Multi-provider support** — OpenAI, Anthropic, Gemini, Ollama out of the box
-- **3 execution strategies** — Parallel, Sequential, Fallback
-- **Composable response validation** — JSON, Regex, Length, Content Filter, Custom
-- **Weighted scoring system** — Validation, Speed, Token Efficiency, Consensus Alignment
-- **3 consensus strategies** — Highest Score, Majority Vote, Quorum
-- **Fluent pipeline API** — chain every stage with a clean builder pattern
-- **Prompt templates** — `{{variable}}` substitution with default values
-- **Configurable retry policies** — Exponential Backoff with jitter, Fixed Delay, Rate-Limit Aware
-- **Circuit breaker pattern** — per-provider Open/HalfOpen/Closed state machine with configurable thresholds
-- **Rate-limit detection** — Retry-After + X-RateLimit header parsing, automatic backoff on 429
-- **Built-in performance analytics** — success rates, latency, win rates per model
-- **Thread-safe concurrent execution** — `ConcurrentDictionary`-backed tracking
-- **Zero external LLM SDKs** — raw `HttpClient` to each provider's REST API
-- **Full DI/IoC support** — one-liner registration with `AddLLMForge`
+- **Multi-provider support** — OpenAI, Anthropic, Google Gemini behind a single interface
+- **Automatic failover** — if one provider fails, seamlessly falls back to the next
+- **Built-in retry with circuit breaker** — handles rate limits and transient failures
+
+## Advanced Features (opt-in)
+
+- Multi-model execution strategies (race, fallback, consensus)
+- Response validation pipeline
+- Weighted scoring across providers
+- Usage analytics and cost tracking
+
+---
+
+## Design Decisions
+
+- **No LangChain/Semantic Kernel dependency** — intentionally minimal. LLMForge does one thing: reliable LLM API calls with failover. It doesn't try to be a framework.
+- **Raw HttpClient** — zero SDK dependencies means no version conflicts and full control over retry/timeout behavior.
+- **Opt-in complexity** — basic usage requires 3 lines of code. Advanced features (consensus, scoring) are there when you need them.
 
 ---
 
@@ -396,11 +400,19 @@ API keys are stored in session memory only — never written to disk.
 
 ---
 
-## Born From Production
+## Background
 
-> LLMForge was extracted from the AI orchestration layer of an enterprise education platform that uses 5 LLM models with autonomous agent architecture to generate and validate curriculum-aligned content for 1,500+ students across 4+ years of production use.
+> Started as an internal abstraction to avoid vendor lock-in when switching between OpenAI and Anthropic APIs. The failover and retry logic was added after experiencing real outages during peak exam periods on an education platform serving 1,500+ students.
 
-Every feature exists because a production system needed it: multi-model consensus to catch hallucinations, fallback chains for 99.9% uptime, JSON validation for downstream services, and analytics to decide which model to promote next quarter.
+---
+
+## Testing
+
+High test coverage on core flows (provider failover, retry logic, response validation). All tests run with mocked HTTP — no API keys needed.
+
+```bash
+dotnet test
+```
 
 ---
 
@@ -421,7 +433,7 @@ LLMForge/
 │   ├── Diagnostics/           Performance tracking
 │   ├── Templates/             Prompt templates
 │   └── Extensions/            DI registration
-├── tests/LLMForge.Tests/      99 unit tests (xUnit + Moq + FluentAssertions)
+├── tests/LLMForge.Tests/      Unit tests (xUnit + Moq + FluentAssertions)
 ├── samples/LLMForge.Demo/     Blazor Server demo UI
 └── LLMForge.sln
 ```
